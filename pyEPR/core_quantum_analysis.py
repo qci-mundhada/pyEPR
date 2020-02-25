@@ -764,7 +764,7 @@ class QuantumAnalysis(object):
 
         # TODO: shouldmove these kwargs to the config
         cmap = cmap_discrete(n_modes)
-        kw = dict(ax=ax, color=cmap, legend=False, lw=0, ms=0)
+        kw = dict(ax=ax, color=cmap, lw=0, ms=0)
 
         # Choose which freq should have the solid line drawn with it. ND if present, else f1
         if f_ND.empty:
@@ -777,9 +777,9 @@ class QuantumAnalysis(object):
             # plot the ND as points if present
             f_ND.plot(**{**kw, **dict(marker='o', ms=4, zorder=30)})
 
-        f0.plot(**{**kw, **dict(marker='x', ms=2, zorder=10)})
-        f1.plot(**{**kw, **dict(marker=markerf1, ms=4, zorder=20)})
-        plt_me_line.plot(**{**kw, **dict(lw=1, alpha=0.6, color='grey')})
+        f0.plot(legend=False, **{**kw, **dict(marker='x', ms=2, zorder=10)})
+        f1.plot(legend=False, **{**kw, **dict(marker=markerf1, ms=4, zorder=20)})
+        plt_me_line.plot(legend=True, **{**kw, **dict(lw=1, alpha=0.6)})
 
         ############################################################################
         # Axis: Quality factors'
@@ -790,8 +790,8 @@ class QuantumAnalysis(object):
         ax = axs[1, 0]
         ax.set_title('Quality factors')
         Qs.plot(ax=ax, lw=0, marker=markerf1, ms=4,
-                legend=True, zorder=20, color=cmap)
-        Qs.plot(ax=ax, lw=1, alpha=0.2, color='grey', legend=False)
+                legend=False, zorder=20, color=cmap)
+        Qs.plot(ax=ax, lw=1, alpha=0.2, color=cmap, legend=True)
         ax.set_yscale('log')
 
         ############################################################################
@@ -805,8 +805,8 @@ class QuantumAnalysis(object):
             Intenral function to plot chi and then also to plot alpha
             """
             idx = pd.IndexSlice
-            kw1 = dict(lw=0, ms=4,  marker='o' if primary else 'x')
-            kw2 = dict(lw=1, alpha=0.2, color='grey', label='_nolegend_')
+            kw1 = dict(lw=0, ms=4,  marker='o' if primary else 'x',legend=False)
+            kw2 = dict(lw=1, alpha=0.2,legend=True)
             # ------------------------
             # Plot anharmonicity
             ax = axs[0, 1]
@@ -814,26 +814,30 @@ class QuantumAnalysis(object):
                 alpha = chi.loc[idx[:, mode], mode].unstack(1)
                 alpha.plot(ax=ax, label=mode, color=cmap[i], **kw1)
                 if primary:
-                    alpha.plot(ax=ax, **kw2)
+                    alpha.plot(ax=ax, label=mode, color=cmap[i], **kw2)
 
             # ------------------------
             # Plot chi
             ax = axs[1, 1]
+            chi_cmap = cmap_discrete(int(n_modes*(n_modes-1)/2))
+            print(chi_cmap)
+            color_counter = 0
             for mode in mode_idx:  # mode index number, mode index
                 # restart the color counter i; n= mode2
                 for i, mode2 in enumerate(mode_idx):
                     if int(mode2) > int(mode):
                         chi_element = chi.loc[idx[:, mode], mode2].unstack(1)
-                        chi_element.plot(
-                            ax=ax, label=f"{mode},{mode2}", color=cmap[i], **kw1)
+                        chi_element.rename(columns={mode:f'{mode},{mode2}'}, inplace=True)
+                        chi_element.plot(ax=ax, color=chi_cmap[color_counter], **kw1)
 
                         if primary:
-                            chi_element.plot(ax=ax, **kw2)
+                            chi_element.plot(ax=ax, color=chi_cmap[color_counter], **kw2)
+                        color_counter+=1
 
         def do_legends():
-            legend_translucent(axs[0][1],  leg_kw=dict(
-                fontsize=7, title='Mode'))
-            legend_translucent(axs[1][1],  leg_kw=dict(fontsize=7))
+            legend_translucent(axs[0][1], leg_kw=dict(
+                fontsize=8, title='Mode'))
+            legend_translucent(axs[1][1], leg_kw=dict(fontsize=8))
 
         chiO1 = self.get_chis(variations=variations,
                               swp_variable=swp_variable, numeric=False)
@@ -844,11 +848,11 @@ class QuantumAnalysis(object):
             [r['fock_trunc'] == None for k, r in self.results.items()])
         if use_ND:
             plot_chi_alpha(chiND, True)
-            do_legends()
+            #do_legends()
             plot_chi_alpha(chiO1, False)
         else:
             plot_chi_alpha(chiO1, True)
-            do_legends()
+            #do_legends()
 
         for ax1 in axs:
             for ax in ax1:
