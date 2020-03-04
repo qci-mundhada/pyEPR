@@ -394,7 +394,7 @@ variation mode
     def calc_energy_electric(self,
                              variation=None,
                              volume='AllObjects',
-                             smooth=False):
+                             smooth=True):
         r'''
         Calculates two times the peak electric energy, or 4 times the RMS,
         :math:`4*\mathcal{E}_{\mathrm{elec}}`
@@ -581,6 +581,7 @@ variation mode
         uj = [float(u[0]/jl), float(u[1]/jl), float(u[2]/jl)]
         return jl, uj
 
+    """
     def get_Qseam(self, seam, mode, variation):
         r'''
         Caculate the contribution to Q of a seam, by integrating the current in
@@ -605,6 +606,41 @@ variation mode
               str(config.dissipation.gseam/config.dissipation.yseam))
 
         return pd.Series(Qseam)
+    """
+    def get_Qseam(self, seam, mode, variation, smooth=True):
+        r'''
+        Caculate the contribution to Q of a seam, by integrating the current in
+        the seam with finite conductance: set in the config file
+        ref: http://arxiv.org/pdf/1509.01119.pdf
+        '''
+
+        lv = self._get_lv(variation)
+        y_and_Qseam = OrderedDict()
+        print('Calculating Qseam_' + seam + ' for mode ' + str(mode) +
+              ' (' + str(mode) + '/' + str(self.n_modes-1) + ')')
+        # overestimating the loss by taking norm2 of j, rather than jperp**2
+
+        calcobject = CalcObject([], self.setup)
+        vecH = calcobject.getQty("H")
+        tangent = calcobject.getTangent()
+
+        A = vecH.dot(tangent)
+        if smooth:
+            A = A.smooth()
+        A = A.complexmag()
+        A = A.__rmul__(A)
+        A = A.integrate_line(seam)
+        H_tangent_square_int_seam = A.evaluate(lv=lv,phase=90) 
+
+        yseam = H_tangent_square_int_seam/self.U_E/(self.omega*1e9)
+
+        y_and_Qseam['yseam_'+seam] = yseam
+        y_and_Qseam['Qseam_'+seam] = config.dissipation.gseam/yseam
+
+        print('y_seam: ', yseam)
+        print('Q_seam: ',  str(config.dissipation.gseam/yseam))
+
+        return pd.Series(y_and_Qseam)
 
     def get_Qseam_sweep(self, seam, mode, variation, variable, values, unit, pltresult=True):
         """
@@ -1029,7 +1065,7 @@ variation mode
                 if self.pinfo.dissipative.resistive_surfaces is not None:
                     raise NotImplementedError(
                         "Join the team, by helping contribute this piece of code.")
-
+                
                 SOL[mode] = sol
 
             # Save

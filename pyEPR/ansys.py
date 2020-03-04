@@ -2581,6 +2581,10 @@ class CalcObject(COMWrapper):
     def getQty(self, name):
         stack = self.stack + [("EnterQty", name)]
         return CalcObject(stack, self.setup)
+    
+    def getTangent(self):
+        stack = self.stack + [("CalcOp", "Tangent")]
+        return CalcObject(stack, self.setup)
 
     def integrate_line(self, name):
         return self._integrate(name, "EnterLine")

@@ -199,7 +199,9 @@ class ProjectInfo(object):
                     setup = self.design.create_dm_setup()  # adding a driven modal design
                     self.setup_name = setup.name
             else:
-                self.setup_name = setup_names[0]
+                if self.setup_name not in setup_names:
+                    logger.warning('\tUser specified design setup does not exist. Utilizing the default satup.')
+                    self.setup_name = setup_names[0]
 
             # get the actual setup if there is one
             self.get_setup(self.setup_name)

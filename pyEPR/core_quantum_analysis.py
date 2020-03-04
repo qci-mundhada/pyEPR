@@ -417,7 +417,7 @@ class QuantumAnalysis(object):
         --------------------
             variations : None returns all_variations otherwis this is a list with number
                          as strings ['0', '1']
-            nalyze_previous :set to true if you wish to overwrite previous analysis
+            analyze_previous :set to true if you wish to overwrite previous analysis
         '''
 
         result = OrderedDict()
@@ -655,6 +655,8 @@ class QuantumAnalysis(object):
         if print_result:
             self.print_variation(variation)
             self.print_result(result)
+            print("\n*** Other calculations")
+            print(self.sols[variation])
 
         return result
 
@@ -698,6 +700,7 @@ class QuantumAnalysis(object):
 
         print('\n*** Q_coupling')
         print(result['Q_coupling'])
+
 
     def plotting_dic_x(self, Var_dic, var_name):
         dic = {}
