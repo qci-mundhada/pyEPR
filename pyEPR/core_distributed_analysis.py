@@ -666,14 +666,24 @@ variation mode
         for value in values:
             self.design.set_variable(variable, str(value)+unit)
 
-            # overestimating the loss by taking norm2 of j, rather than jperp**2
-            j_2_norm = self.fields.Vector_Jsurf.norm_2()
-            int_j_2 = j_2_norm.integrate_line(seam)
-            int_j_2_val = int_j_2.evaluate(lv=lv, phase=90)
-            yseam = int_j_2_val/self.U_H/self.omega
+            # utilizing H_tangent intergral method for y_seam
+            calcobject = CalcObject([], self.setup)
+            vecH = calcobject.getQty("H")
+            tangent = calcobject.getTangent()
+
+            A = vecH.dot(tangent)
+            if smooth:
+                A = A.smooth()
+            A = A.complexmag()
+            A = A.__rmul__(A)
+            A = A.integrate_line(seam)
+            H_tangent_square_int_seam = A.evaluate(lv=lv,phase=90) 
+
+            yseam = H_tangent_square_int_seam/self.U_E/(self.omega*1e9)
+
+            print('y_seam: ', yseam)
+            print('Q_seam: ',  str(config.dissipation.gseam/yseam))
             Qseamsweep.append(config.dissipation.gseam/yseam)
-#        Qseamsweep['Qseam_sweep_'+seam+'_'+str(mode)] = gseam/yseam
-            # Cprint 'Qseam_' + seam + '_' + str(mode) + str(' = ') + str(gseam/yseam)
 
         if pltresult:
             _, ax = plt.subplots()
@@ -751,7 +761,7 @@ variation mode
         For a single specific mode.
         Expected that you have specified the mode before calling this, `self.set_mode(num)`
 
-        Expected to precalc U_H and U_E for mode, will retunr pandas pd.Series object
+        Expected to precalc U_H and U_E for mode, will return pandas pd.Series object
             junc_rect = ['junc_rect1', 'junc_rect2'] name of junc rectangles to integrate H over
             junc_len  = [0.0001]   specify in SI units; i.e., meters
             LJs       = [8e-09, 8e-09] SI units
@@ -763,11 +773,11 @@ variation mode
 
         Note:
         --------------
-            U_E and U_H are the total peak energy. (NOT twice as in U_ and U_H other places)
+            U_E and U_H are the total peak energy. (NOT twice as in U_E and U_H other places)
 
 
         Potential errors:  If you dont have a line or rect by the right name you will prob
-        get an erorr o the type:
+        get an erorr of the type:
         com_error: (-2147352567, 'Exception occurred.', (0, None, None, None, 0, -2147024365), None)
         '''
 
