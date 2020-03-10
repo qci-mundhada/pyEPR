@@ -1338,7 +1338,7 @@ class HfssEMDesignSolutions(HfssDesignSolutions):
     self._solutions.ExportEigenmodes(soln_name, ['Pass:=5'], fn) # ['Pass:=5'] fails  can do with ''
     """
 
-    def set_mode(self, n, phase=0, FieldType='EigenStoredEnergy'):
+    def set_mode(self, n, phase=0, FieldType='EigenPeakElectricField'):
         '''
         Indicates which source excitations should be used for fields post processing.
         HFSS>Fields>Edit Sources
@@ -1364,20 +1364,32 @@ class HfssEMDesignSolutions(HfssDesignSolutions):
             raise Exception(err)
         
         # THIS WORKS FOR v2019R2
-        
-        self._solutions.EditSources(
-        [
+
+        if FieldType is 'EigenStoredEnergy':
+            self._solutions.EditSources(
             [
-                "FieldType:="   , "EigenPeakElectricField"
-            ],       
+                [
+                    "FieldType:="		, "EigenStoredEnergy"
+                ],
+                [
+                    "Name:="		, "Modes",
+                    "Magnitudes:="		, ["1" if i + 1 == n else "0" for i in range(n_modes)]
+                ]
+            ])
+        else:
+            self._solutions.EditSources(
             [
-                "Name:=", "Modes",
-                "Magnitudes:=", ["1" if i + 1 ==
-                            n else "0" for i in range(n_modes)],
-                "Phases:=", [str(phase) if i + 1 ==
-                               n else "0" for i in range(n_modes)]
-            ]
-        ])
+                [
+                    "FieldType:="   , "EigenPeakElectricField"
+                ],       
+                [
+                    "Name:=", "Modes",
+                    "Magnitudes:=", ["1" if i + 1 ==
+                                n else "0" for i in range(n_modes)],
+                    "Phases:=", [str(phase) if i + 1 ==
+                                n else "0" for i in range(n_modes)]
+                ]
+            ])
         
         """
         # TODO: WARNING: Note that the syntax has changed for AEDT 18.2.

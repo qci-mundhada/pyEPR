@@ -187,7 +187,7 @@ from .core import ProjectInfo, DistributedAnalysis, QuantumAnalysis,\
 
 __all__ = ['logger', 'config',
            'toolbox', 'calcs', 'ansys', 'core',
-           'ProjectInfo',  'DistributedAnalysis', 'QuantumAnalysis',
+           'ProjectInfo',  'DistributedAnalysis', 'QuantumAnalysis', 'additional_tools',
            'Project_Info', 'pyEPR_HFSSAnalysis','pyEPR_Analysis', # names to be depricated
            'parse_units', 'parse_units_user', 'parse_entry'
            ]

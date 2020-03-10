@@ -656,7 +656,7 @@ class QuantumAnalysis(object):
             self.print_variation(variation)
             self.print_result(result)
             print("\n*** Other calculations")
-            print(self.sols[variation])
+            display(self.sols[variation])
 
         return result
 

@@ -516,7 +516,7 @@ variation mode
         '''
         Peak current I_max for prespecified mode calculating line voltage across junction.
 
-        Make sure that oyu have set the correct variaitonin hFSS before running this
+        Make sure that you have set the correct variaitonin hFSS before running this
 
         Parameters:
         ------------------------------------------------
@@ -607,7 +607,7 @@ variation mode
 
         return pd.Series(Qseam)
     """
-    def get_Qseam(self, seam, mode, variation, smooth=True):
+    def get_Qseam(self, seam, mode, variation, ansys_energies=None, smooth=True):
         r'''
         Caculate the contribution to Q of a seam, by integrating the current in
         the seam with finite conductance: set in the config file
@@ -632,17 +632,25 @@ variation mode
         A = A.integrate_line(seam)
         H_tangent_square_int_seam = A.evaluate(lv=lv,phase=90) 
 
-        yseam = H_tangent_square_int_seam/self.U_E/(self.omega*1e9)
+        if len(self.pinfo.junctions) is not 0:
+            total_energy = self.U_H+ sum(list(ansys_energies[mode]['U_J_inds'].values()))
+        else:
+            print("Seems like there are no junctions. Using U_H as the total energy")
+            total_energy = self.U_H
 
+        yseam = H_tangent_square_int_seam/total_energy/(self.omega*1e9)
+
+        y_and_Qseam['U_total'] = total_energy
         y_and_Qseam['yseam_'+seam] = yseam
         y_and_Qseam['Qseam_'+seam] = config.dissipation.gseam/yseam
 
+        print('total_energy:', total_energy)
         print('y_seam: ', yseam)
         print('Q_seam: ',  str(config.dissipation.gseam/yseam))
 
         return pd.Series(y_and_Qseam)
 
-    def get_Qseam_sweep(self, seam, mode, variation, variable, values, unit, pltresult=True):
+    def get_Qseam_sweep(self, seam, mode, variation, variable, values, unit, ansys_energies=None,pltresult=True):
         """
         Q due to seam loss.
 
@@ -679,7 +687,13 @@ variation mode
             A = A.integrate_line(seam)
             H_tangent_square_int_seam = A.evaluate(lv=lv,phase=90) 
 
-            yseam = H_tangent_square_int_seam/self.U_E/(self.omega*1e9)
+            if len(self.pinfo.junctions) is not 0:
+                total_energy = ansys_energies[mode]['U_tot_ind']
+            else:
+                print("Seems like there are no junctions. Using U_H as the total energy")
+                total_energy = self.U_H
+
+            yseam = H_tangent_square_int_seam/total_energy/(self.omega*1e9)
 
             print('y_seam: ', yseam)
             print('Q_seam: ',  str(config.dissipation.gseam/yseam))
@@ -998,7 +1012,7 @@ variation mode
             for mode in modes:  # integer of mode number [0,1,2,3,..]
 
                 # Load fields for mode
-                self.set_mode(mode)
+                self.set_mode(mode,FieldType='EigenStoredEnergy')
 
                 # Get HFSS  solved frequencies
                 _Om = pd.Series({})
@@ -1041,6 +1055,7 @@ variation mode
                 Pm[mode], Sm[mode], Pm_cap[mode], I_peak[mode], V_peak[mode], ansys_energies[mode] = self.calc_p_junction(
                     variation, self.U_H/2., self.U_E/2., Ljs, Cjs)
 
+                #sol = sol.append(pd.Series({'U_total':ansys_energies[mode]['U_tot_ind']}))
                 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
                 # EPR Dissipative calculations -- should be a function block below
 
@@ -1055,7 +1070,7 @@ variation mode
                 # get seam Q
                 if self.pinfo.dissipative.seams:
                     for seam in self.pinfo.dissipative.seams:
-                        sol = sol.append(self.get_Qseam(seam, mode, variation))
+                        sol = sol.append(self.get_Qseam(seam, mode, variation,ansys_energies=ansys_energies))
 
                 # get Q dielectric
                 if self.pinfo.dissipative.dielectrics_bulk:
@@ -1240,7 +1255,7 @@ variation mode
         '''
         return self.hfss_report_f_convergence(variation)
 
-    def set_mode(self, mode_num, phase=0):
+    def set_mode(self, mode_num, phase=0,FieldType='EigenPeakElectricField'):
         '''
         Set source excitations should be used for fields post processing.
         Counting modes from 0 onward
@@ -1250,7 +1265,7 @@ variation mode
         if mode_num < 0:
             logger.error('Too small a mode number')
 
-        self.solutions.set_mode(mode_num + 1, phase)
+        self.solutions.set_mode(mode_num + 1, phase,FieldType=FieldType)
 
         if self.has_fields() == False:
             logger.warning(f" Error: HFSS does not have field solution for mode={mode_num}.\
