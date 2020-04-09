@@ -43,7 +43,7 @@ config = Dict( # pylint: disable=invalid-name
     epr = Dict(
 
         # Use participation enomalizaiton or now
-        renorm_pj = True,
+        renorm_pj = False,
     ),
 
     # Loss properties of various materials and surfaces
