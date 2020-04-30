@@ -4,6 +4,7 @@ File for additional tools developed by QCI team
 import pandas as pd
 import itertools as it
 import numpy as np
+import h5py
 
 def get_cross_kerr_table(epr, swp_variable, numeric):
     """
@@ -21,12 +22,19 @@ def get_cross_kerr_table(epr, swp_variable, numeric):
     if numeric:
         f1 = epr.results.get_frequencies_ND(vs=swp_variable)
         chis = epr.get_chis(numeric=numeric,swp_variable=swp_variable)
+
     else:
         f1 = epr.results.get_frequencies_O1(vs=swp_variable)
         chis = epr.get_chis(numeric=numeric,swp_variable=swp_variable)
 
+    print(f1)
+    print(chis)
+
+
     swp_indices = chis.index.levels[0]
     mode_indices = chis.index.levels[1]
+
+    print(mode_indices)
 
     mode_combinations = list(zip(mode_indices,mode_indices))
     diff_mode_combinations = list(it.combinations_with_replacement(mode_indices,2))
@@ -73,3 +81,54 @@ def analyze_sweep_no_junctions(epr_hfss):
     all_data = pd.concat(all_data,keys=variations)
 
     return all_data
+
+def set_h5_attrs(g, kwargs):
+    """Sets attributes of HDF5 group/file g according to dict kwargs.
+    Args:
+        g (HDF5 group or file): Group or file you would like to update.
+        kwargs (dict): Dict of data with which to update g.
+    """
+    for name, value in kwargs.items():
+        print(name)
+        if name=='hfss_variables' or name=='fock_trunc'or name=='cos_trunc':
+            continue
+        if isinstance(value, dict):
+            sub_g = g.require_group(name)
+            set_h5_attrs(sub_g, value)
+        else:
+            if isinstance(value, (list, np.ndarray)) and len(value) > 0:
+                # if isinstance(value[0], (str, unicode)): #python 2 vs python 3 issue
+                if isinstance(value[0], (bytes,str)):
+                    g.attrs[name] = _byteify(value)
+                else:
+                    # create or overwrite dataset
+                    # this only works if value has the same shape as original dataset
+                    array = np.array(value)
+                    ds = g.require_dataset(name, shape=array.shape, dtype=array.dtype, exact=True)
+                    ds[...] = array
+                    # we could instead do the following to overwrite with data of a different shape:
+                    # ds = g.require_dataset(name, shape=array.shape, dtype=array.dtype, exact=True)
+                    # del ds
+                    # g.create_dataset(name, data=array)
+            else:
+                g.attrs[name] = value
+def group_to_dict(group):
+    """Recursively load the contents of an h5py group into a dict.
+    Args:
+        group (h5py group): Group from which you want to load all data.
+    Returns:
+        target (dict): Dict with contents of group loaded into it.
+    """
+    target = {}
+    for key, value in group.items():
+        target[key] = {}
+        if hasattr(value, 'attrs') and len(value.attrs):
+            target[key].update(group_to_dict(value.attrs))
+        if hasattr(value, 'keys'):
+            target[key].update(group_to_dict(value))
+        elif isinstance(value, h5py.Dataset):
+            target[key] = np.array(value)
+        else:
+            target[key] = value
+    return target
+
