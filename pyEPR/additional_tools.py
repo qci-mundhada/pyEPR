@@ -149,6 +149,8 @@ def get_params_for_forest_calc(epr,variation,ss,N, qubit_index,round_to=3):
 class forest_calc(object):
 
     def __init__(self, f0, kappas, chis, qubit_index, ignore_modes = []):
+
+        # Expecting f0, kappa and chis in GHz
         
         self.f0= f0
         self.kappas = kappas
@@ -194,9 +196,76 @@ class forest_calc(object):
 
     def get_single_pump_process_params(self,process_indices,process_individual_freqs,xi):
         
-        process_freqs = []
-        process_bandwidths = []
-        process_gs = []
+
+
+        chis = self.chis
+        qubit_index = self.qubit_index
+        phis = self.phis
+        kappas = self.kappas
+
+        process_dict = {'process_indices':[],
+                        'process_individual_freqs': [],
+                        'process_freqs': [],
+                        'process_bandwidths': [],
+                        'process_gs': [],
+                        'kappa_eff_resonant':[],
+                        'T_induced_resonant':[]   
+                        }
+        
+        for (inds, fs) in zip(process_indices, process_individual_freqs):
+            
+            if len(inds) is 2:
+                process_freq = np.abs(np.sum(fs))/2
+                g = phis[inds[0]]*phis[inds[1]]*phis[qubit_index]**2*xi**2*chis[qubit_index,qubit_index] # phi_1*phi_2*phi_q^2*E_J/2 where by 2 since 2 pumps are identical
+                if fs[0]==fs[1]:
+                    g = g/2 # combinatorial factor for identical modes
+                
+            if len(inds) is 3:
+                process_freq = np.abs(np.sum(fs))
+                g = phis[inds[0]]*phis[inds[1]]*phis[inds[2]]*phis[qubit_index]*xi*chis[qubit_index,qubit_index]*2 # phi_1*phi_2*phi_q^2*E_J 
+                if fs[0]==fs[1] and fs[1]==fs[2]:
+                    g = g/6 # division by 3! for identical modes
+                elif fs[0]==fs[1] or fs[1]==fs[2] or fs[2]==fs[1]:
+                    g = g/2 # division by 2! since two modes are identical
+                else:
+                    g=g
+
+            process_bandwidth = np.max(kappas[list(inds)])
+            kappa_eff_resonant= 4*g**2/(process_bandwidth)
+            T_induced_resonant = (1/(2*np.pi*np.asarray(kappa_eff_resonant)))
+
+
+            process_dict['process_indices'].append(inds)
+            process_dict['process_individual_freqs'].append(fs)        
+            process_dict['process_freqs'].append(process_freq)
+            process_dict['process_gs'].append(g)
+            process_dict['process_bandwidths'].append(process_bandwidth)
+            process_dict['kappa_eff_resonant'].append(kappa_eff_resonant)
+            process_dict['T_induced_resonant'].append(T_induced_resonant)
+ 
+            
+        return process_dict
+
+    def get_double_pump_process_params(self,process_indices,process_individual_freqs,xi_1,xi_2):
+
+
+        sum_process_dict = {'process_indices':[],
+                            'process_individual_freqs': [],
+                            'process_freqs': [],
+                            'process_bandwidths': [],
+                            'process_gs': [],
+                            'kappa_eff_resonant':[],
+                            'T_induced_resonant':[]   
+                           }
+
+        diff_process_dict = {'process_indices':[],
+                            'process_individual_freqs': [],
+                            'process_freqs': [],
+                            'process_bandwidths': [],
+                            'process_gs': [],
+                            'kappa_eff_resonant':[],
+                            'T_induced_resonant':[]   
+                           }
 
         chis = self.chis
         qubit_index = self.qubit_index
@@ -206,67 +275,114 @@ class forest_calc(object):
         
         for (inds, fs) in zip(process_indices, process_individual_freqs):
             
-            if len(inds) is 2:
-                process_freqs.append(np.abs(np.sum(fs))/2)
-                g = phis[inds[0]]*phis[inds[1]]*phis[qubit_index]**2*xi**2*chis[qubit_index,qubit_index] # phi_1*phi_2*phi_q^2*E_J/2 where by 2 since 2 pumps are identical
+            if len(inds) == 2:
+                process_freq = np.abs(np.sum(fs))
+                g = phis[inds[0]]*phis[inds[1]]*phis[qubit_index]**2*xi_1*xi_2*chis[qubit_index,qubit_index]*2 # phi_1*phi_2*phi_q^2*E_J/2 where by 2 since 2 pumps are identical
                 if fs[0]==fs[1]:
                     g = g/2 # combinatorial factor for identical modes
-                
-            if len(inds) is 3:
-                process_freqs.append(np.abs(np.sum(fs)))
-                g = phis[inds[0]]*phis[inds[1]]*phis[inds[2]]*phis[qubit_index]*xi*chis[qubit_index,qubit_index]*2 # phi_1*phi_2*phi_q^2*E_J 
-                if fs[0]==fs[1] and fs[1]==fs[2]:
-                    g = g/6 # division by 3! for identical modes
-                elif fs[0]==fs[1] or fs[1]==fs[2] or fs[2]==fs[1]:
-                    g = g/2 # division by 2! since two modes are identical
+
+                process_bandwidth = np.max(kappas[list(inds)])
+                kappa_eff_resonant = 4*g**2/(process_bandwidth)
+                T_induced_resonant = (1/(2*np.pi*np.asarray(kappa_eff_resonant)))
+
+                if fs[0]>0: 
+                    process_dict = sum_process_dict
                 else:
-                    g=g
-            process_gs.append(g)
-            process_bandwidths.append(np.max(kappas[list(inds)]))
-            
-        return process_freqs, process_bandwidths, process_gs
+                    process_dict = diff_process_dict
+
+                process_dict['process_indices'].append(inds)
+                process_dict['process_individual_freqs'].append(fs)        
+                process_dict['process_freqs'].append(process_freq)
+                process_dict['process_gs'].append(g)
+                process_dict['process_bandwidths'].append(process_bandwidth)
+                process_dict['kappa_eff_resonant'].append(kappa_eff_resonant)
+                process_dict['T_induced_resonant'].append(T_induced_resonant)
+
+
+        return sum_process_dict, diff_process_dict
+
             
 
-    def get_kappa_induced(self, mode_index, frequency, process_freqs, process_bandwidths, process_gs):
+    def _get_kappa_induced(self, frequency, process_dict):
         
         kappa_eff = 0
         kappa_eff_resonant = []
-        
+
+        process_freqs = process_dict['process_freqs']
+        process_bandwidths = process_dict['process_bandwidths']
+        process_gs = process_dict['process_gs']
+
         for i in range(len(process_freqs)):
             kappa_eff = kappa_eff + process_gs[i]**2*process_bandwidths[i]/( (process_freqs[i]-frequency)**2 + process_bandwidths[i]**2/4 )
-            kappa_eff_resonant.append(4*process_gs[i]**2/(process_bandwidths[i]))
             
-        return kappa_eff, kappa_eff_resonant
+        return kappa_eff
+
+
+    def tidy_up_data_frame(self,df,modify_units=False):
+
+        if not modify_units:
+
+            rename_dict = {'process_freqs':'process_freqs [GHz]', 
+                        'process_gs':'process_gs [GHz]',
+                        'process_individual_freqs':'process_individual_freqs [GHz]',
+                        'process_bandwidths':'process_bandwidths [GHz]',
+                        'kappa_eff_resonant':'kappa_eff_resonant [GHz]',
+                        'T_induced_resonant':'T_induced_resonant [ns]'}
+        else:
+
+            rename_dict = {'process_freqs':'process_freqs [GHz]', 
+                        'process_gs':'process_gs [MHz]',
+                        'process_individual_freqs':'process_individual_freqs [GHz]',
+                        'process_bandwidths':'process_bandwidths [MHz]',
+                        'kappa_eff_resonant':'kappa_eff_resonant [kHz]',
+                        'T_induced_resonant':'T_induced_resonant [us]'}
+
+            df['process_gs'] = df['process_gs'].map(lambda x: x*1e3)
+            df['process_bandwidths'] = df['process_bandwidths'].map(lambda x: x*1e3)
+            df['kappa_eff_resonant'] = df['kappa_eff_resonant'].map(lambda x: x*1e6)
+            df['T_induced_resonant'] = df['T_induced_resonant'].map(lambda x: x/1e3)
+
+        df.rename(columns=rename_dict,inplace=True)
+
+        return df
+
+
+
+    def get_induced_kappa_two_pump(self,mode_index, xi_1, xi_2, frequency_1, frequency_2):
+        
+
+        process_indices, process_individual_freqs = self.get_processes(mode_index)
+        pump_1_process_dict = self.get_single_pump_process_params(process_indices, process_individual_freqs,xi_1)
+        pump_2_process_dict = self.get_single_pump_process_params(process_indices, process_individual_freqs,xi_2)
+        sum_process_dict, diff_process_dict = self.get_double_pump_process_params(process_indices,process_individual_freqs,xi_1,xi_2)
+
+        kappa_eff = 0
+
+        process_dicts = [pump_1_process_dict, pump_2_process_dict, sum_process_dict, diff_process_dict]
+        frequencies = [frequency_1, frequency_2, np.abs(frequency_1+frequency_2), np.abs(frequency_1-frequency_2)]
+        
+        partial_kappa_effs = []
+        for process_dict, frequency in zip(process_dicts,frequencies):
+            tmp =  self._get_kappa_induced(frequency,process_dict)
+            kappa_eff = kappa_eff + tmp
+            partial_kappa_effs.append(tmp)
+
+        process_dfs = {'pump_1_processes':self.tidy_up_data_frame(pd.DataFrame.from_dict(pump_1_process_dict)),
+                       'pump_2_processes':self.tidy_up_data_frame(pd.DataFrame.from_dict(pump_2_process_dict)), 
+                       'sum_processes':self.tidy_up_data_frame(pd.DataFrame.from_dict(sum_process_dict)),
+                       'diff_processes':self.tidy_up_data_frame(pd.DataFrame.from_dict(diff_process_dict))
+                       }
+                        
+        return kappa_eff, partial_kappa_effs, process_dfs
             
-    def get_induced_kappa_vs_frequency(self,mode_index,xi,frequencies):
+    def get_induced_kappa_vs_frequency(self,mode_index,xi,frequency):
         
         process_indices, process_individual_freqs = self.get_processes(mode_index)
-        process_freqs, process_bandwidths, process_gs = self.get_single_pump_process_params(process_indices, process_individual_freqs,xi)
+        process_dict= self.get_single_pump_process_params(process_indices, process_individual_freqs,xi)
         
-        induced_kappas, kappa_eff_resonant = self.get_kappa_induced(mode_index, frequencies, process_freqs, process_bandwidths, process_gs)
-        
-        T_induced_resonant = list(1/(2*np.pi*np.asarray(kappa_eff_resonant)))
-        
-        
-        dict_of_things_to_return = {'mode_indices':process_indices,
-                                    'process_individual_freqs [GHz]':process_individual_freqs,
-                                    'process_freqs [GHz]':process_freqs,
-                                    'process_bandwidths [GHz]': np.asarray(process_bandwidths),
-                                    'process_gs [GHz]': np.asarray(process_gs),
-                                    'kappa_eff_resonant [GHz]': np.asarray(kappa_eff_resonant),
-                                    'T_induced_resonant [ns]': np.asarray(T_induced_resonant)
-                                }
+        induced_kappas = self._get_kappa_induced(frequency, process_dict)
 
-    #     dict_of_things_to_return = {'mode_indices':process_indices,
-    #                                 'process_individual_freqs [GHz]':process_individual_freqs,
-    #                                 'process_freqs [GHz]':process_freqs,
-    #                                 'process_bandwidths [MHz]': np.asarray(process_bandwidths)*1e3,
-    #                                 'process_gs [MHz]': np.asarray(process_gs)*1e3,
-    #                                 'kappa_eff_resonant [kHz]': np.asarray(kappa_eff_resonant)*1e6,
-    #                                 'T_induced_resonant [us]': np.asarray(T_induced_resonant)/1e3
-    #                              }
-        
-        processes = pd.DataFrame.from_dict(dict_of_things_to_return)
+        processes = self.tidy_up_data_frame(pd.DataFrame.from_dict(process_dict))
 
         return induced_kappas, processes
 
