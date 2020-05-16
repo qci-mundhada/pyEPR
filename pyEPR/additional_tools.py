@@ -6,6 +6,8 @@ import itertools as it
 import numpy as np
 import h5py
 import itertools as it
+from scipy import constants as sc
+from em_simulations.results import network_data as nd
 
 def get_cross_kerr_table(epr, swp_variable, numeric):
     """
@@ -386,8 +388,202 @@ class forest_calc(object):
 
         return induced_kappas, processes
 
+def get_params_for_forest_calc_network(epr,epr_variation,ss,N,qubit_index,modes_to_consider):
+
+    # Always uses the nominal variation for xi_calc also assumes that port for drive pin is 1 and that for junction is 2 
+
+    f0 = epr.results.get_frequencies_O1()[epr_variation].values/1e3
+    chis = epr.get_chis(numeric=False).loc[epr_variation].values/1e3/N**2
+    xi = np.sqrt(ss/(2*chis[qubit_index,qubit_index]))
+
+    w0 = 2e9*np.pi*f0[modes_to_consider]
+    phi_0 = sc.hbar/(2*sc.e)
+    LJ = epr.results[epr_variation]['Ljs'][epr.results[epr_variation]['Ljs'].keys()[0]]
+    EJ_by_hbar = phi_0**2/LJ/sc.hbar
+    phi_zpfs = epr.results[epr_variation]['ZPF'][modes_to_consider][:,0]
+
+    
+
+    return w0, EJ_by_hbar, phi_zpfs, xi
+
+
+class forest_calc_network(object):
+
+    def __init__(self, w0, EJ_by_hbar, N, phi_zpfs, qubit_index, Z_pp, Z_jp, Z_omegas, R0=50):
+
+        # Expecting f0, kappa and chis in GHz
+        
+        self.w0= w0  # rad/s
+        self.EJ_by_hbar = EJ_by_hbar # rad/s 
+        self.N = N
+        self.phis = phi_zpfs
+        self.qubit_index = qubit_index
+        self.Z_pp = Z_pp # Z_port,port Ohm
+        self.Z_Jp = Z_jp # Z_junction,port Ohm
+        self.Z_ws = Z_omegas # frequencies at which the Zs are evaluated. rad/s
+        self.R0 = R0 # 50 Ohm
+        self.all_indices = list(range(len(self.w0)))
+        self.G = Z_jp/(Z_pp+R0)
+        
+    def S_phi(self,omega):
+        return 2*sc.hbar*self.R0/(omega)
+
+    def G_omega(self,omega):
+        return np.interp(omega,self.Z_ws,self.G,left=0, right=0)
+
+
+    def get_kappa_eff_1pump(self,mode_index,omega_pump,xi):
+
+
+        kappa_eff = 0
+        phi_0 = sc.hbar/(2*sc.e)
+
+        # Conversion to environment
+        g = (-self.EJ_by_hbar/2)*self.phis[mode_index]*self.phis[self.qubit_index]**2*xi**2/self.N**2
+        omega = 2*omega_pump+self.w0[mode_index]
+        G = self.G_omega(omega)
+        S = self.S_phi(omega)
+        kappa_eff += np.abs(g*G/phi_0)**2*S*(omega>0).astype(int)
+
+        omega = -2*omega_pump+self.w0[mode_index]
+        G = self.G_omega(omega)
+        S = self.S_phi(omega)
+        kappa_eff += np.abs(g*G/phi_0)**2*S*(omega>0).astype(int)
+
+
+        # Two mode squeezing with environement
+        g = (-self.EJ_by_hbar/2)*self.phis[mode_index]*self.phis[self.qubit_index]**2*xi**2/self.N**2
+        omega = 2*omega_pump-self.w0[mode_index]
+        G = self.G_omega(omega)
+        S = self.S_phi(omega)
+        kappa_eff += np.abs(g*G/phi_0)**2*S*(omega>0).astype(int)
+
+        # Simultaneous two-photon loss
+        g = (-self.EJ_by_hbar/2)*self.phis[mode_index]**2*self.phis[self.qubit_index]*xi/self.N**2
+        omega = omega_pump+2*self.w0[mode_index]
+        G = self.G_omega(omega)
+        S = self.S_phi(omega)
+        kappa_eff += np.abs(g*G/phi_0)**2*S*(omega>0).astype(int)
+
+        omega = -omega_pump+2*self.w0[mode_index]
+        G = self.G_omega(omega)
+        S = self.S_phi(omega)
+        kappa_eff += np.abs(g*G/phi_0)**2*S*(omega>0).astype(int)
+            
+        # Simultaneous two-photon gain
+        g = (-self.EJ_by_hbar/2)*self.phis[mode_index]**2*self.phis[self.qubit_index]*xi/self.N**2
+        omega = omega_pump-2*self.w0[mode_index]
+        G = self.G_omega(omega)
+        S = self.S_phi(omega)
+        kappa_eff += np.abs(g*G/phi_0)**2*S*(omega>0).astype(int)
+
+
+        tmp = self.all_indices.copy()
+        tmp.remove(mode_index)
+
+        for other_mode in tmp:
+
+            # Conversion to environment and one other mode
+            g = (-self.EJ_by_hbar)*self.phis[mode_index]*self.phis[other_mode]*self.phis[self.qubit_index]*xi/self.N**2
+            omega = omega_pump+self.w0[mode_index]-self.w0[other_mode]
+            G = self.G_omega(omega)
+            S = self.S_phi(omega)
+            kappa_eff += np.abs(g*G/phi_0)**2*S*(omega>0).astype(int)
+
+            omega = -omega_pump+self.w0[mode_index]-self.w0[other_mode]
+            G = self.G_omega(omega)
+            S = self.S_phi(omega)
+            kappa_eff += np.abs(g*G/phi_0)**2*S*(omega>0).astype(int)
+
+            # Exciting the mode of interest, another mode and environment
+            g = (-self.EJ_by_hbar)*self.phis[mode_index]*self.phis[other_mode]*self.phis[self.qubit_index]*xi/self.N**2
+            omega = omega_pump-self.w0[mode_index]-self.w0[other_mode]
+            G = self.G_omega(omega)
+            S = self.S_phi(omega)
+            kappa_eff += np.abs(g*G/phi_0)**2*S*(omega>0).astype(int)
+
+        return kappa_eff
+
+
+    def get_kappa_eff_2pump(self,mode_index,omega_pump_1,omega_pump_2,xi_1,xi_2):
+
+
+        
+        phi_0 = sc.hbar/(2*sc.e)
+
+        kappa_eff_pump_1 = self.get_kappa_eff_1pump(mode_index,omega_pump_1,xi_1)
+        kappa_eff_pump_2 = self.get_kappa_eff_1pump(mode_index,omega_pump_2,xi_2)
+
+        kappa_eff_sum = 0
+
+        # Processes enabled by sum of the pumps
+
+        # Conversion to environment
+        g = (-self.EJ_by_hbar)*self.phis[mode_index]*self.phis[self.qubit_index]**2*xi_1*xi_2/self.N**2
+        omega = omega_pump_1 + omega_pump_2 + self.w0[mode_index]
+        G = self.G_omega(omega)
+        S = self.S_phi(omega)
+        kappa_eff_sum += np.abs(g*G/phi_0)**2*S*(omega>0).astype(int)
+
+        omega = -omega_pump_1 - omega_pump_2 + self.w0[mode_index]
+        G = self.G_omega(omega)
+        S = self.S_phi(omega)
+        kappa_eff_sum += np.abs(g*G/phi_0)**2*S*(omega>0).astype(int)
+
+
+        # Two mode squeezing with environement
+        g = (-self.EJ_by_hbar)*self.phis[mode_index]*self.phis[self.qubit_index]**2*xi_1*xi_2/self.N**2
+        omega = omega_pump_1 + omega_pump_2 -self.w0[mode_index]
+        G = self.G_omega(omega)
+        S = self.S_phi(omega)
+        kappa_eff_sum += np.abs(g*G/phi_0)**2*S*(omega>0).astype(int)
+
+        # PRocesses enabled by difference of two pumps
+
+        kappa_eff_diff = 0
+
+        # Conversion to environment
+        g = (-self.EJ_by_hbar)*self.phis[mode_index]*self.phis[self.qubit_index]**2*xi_1*xi_2/self.N**2
+        omega = omega_pump_1 - omega_pump_2 + self.w0[mode_index]
+        G = self.G_omega(omega)
+        S = self.S_phi(omega)
+        kappa_eff_diff += np.abs(g*G/phi_0)**2*S*(omega>0).astype(int)
+
+        omega = omega_pump_2 - omega_pump_1 + self.w0[mode_index]
+        G = self.G_omega(omega)
+        S = self.S_phi(omega)
+        kappa_eff_diff += np.abs(g*G/phi_0)**2*S*(omega>0).astype(int)
+
+        # Two mode squeezing with environement
+        g = (-self.EJ_by_hbar)*self.phis[mode_index]*self.phis[self.qubit_index]**2*xi_1*xi_2/self.N**2
+        omega = omega_pump_1 - omega_pump_2 -self.w0[mode_index]
+        G = self.G_omega(omega)
+        S = self.S_phi(omega)
+        kappa_eff_diff += np.abs(g*G/phi_0)**2*S*(omega>0).astype(int)
+
+        omega = omega_pump_2 - omega_pump_1 -self.w0[mode_index]
+        G = self.G_omega(omega)
+        S = self.S_phi(omega)
+        kappa_eff_diff += np.abs(g*G/phi_0)**2*S*(omega>0).astype(int)
+
+
+        partial_kappa_effs = [kappa_eff_pump_1,kappa_eff_pump_2,kappa_eff_sum,kappa_eff_diff]
+
+        kappa_eff = kappa_eff_pump_1+kappa_eff_pump_2+kappa_eff_sum+kappa_eff_diff
+
+        return kappa_eff, partial_kappa_effs
+
+
 
 
 
     
+
+
+
+    
+
+        
+
+ 
 
