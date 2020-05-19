@@ -435,51 +435,71 @@ class forest_calc_network(object):
     def get_kappa_eff_1pump(self,mode_index,omega_pump,xi):
 
 
-        kappa_eff = 0
+        
         phi_0 = sc.hbar/(2*sc.e)
 
+        omega_dict = {'pump_frequencies':omega_pump}
+
         # Conversion to environment
+        kappa_conv = 0
         g = (-self.EJ_by_hbar/2)*self.phis[mode_index]*self.phis[self.qubit_index]**2*xi**2/self.N**2
         omega = 2*omega_pump+self.w0[mode_index]
         G = self.G_omega(omega)
         S = self.S_phi(omega)
-        kappa_eff += np.abs(g*G/phi_0)**2*S*(omega>0).astype(int)
+        kappa_conv += np.abs(g*G/phi_0)**2*S*(omega>0).astype(int)
+
+        omega_dict['omega_conv'] = omega
 
         omega = -2*omega_pump+self.w0[mode_index]
         G = self.G_omega(omega)
         S = self.S_phi(omega)
-        kappa_eff += np.abs(g*G/phi_0)**2*S*(omega>0).astype(int)
+        kappa_conv += np.abs(g*G/phi_0)**2*S*(omega>0).astype(int)
+
+        omega_dict['omega_conv_neg_pump'] = omega
 
 
         # Two mode squeezing with environement
+        kappa_tms = 0
         g = (-self.EJ_by_hbar/2)*self.phis[mode_index]*self.phis[self.qubit_index]**2*xi**2/self.N**2
         omega = 2*omega_pump-self.w0[mode_index]
         G = self.G_omega(omega)
         S = self.S_phi(omega)
-        kappa_eff += np.abs(g*G/phi_0)**2*S*(omega>0).astype(int)
+        kappa_tms += np.abs(g*G/phi_0)**2*S*(omega>0).astype(int)
+
+        omega_dict['omega_tms'] = omega
 
         # Simultaneous two-photon loss
+        kappa_tpl = 0
         g = (-self.EJ_by_hbar/2)*self.phis[mode_index]**2*self.phis[self.qubit_index]*xi/self.N**2
         omega = omega_pump+2*self.w0[mode_index]
         G = self.G_omega(omega)
         S = self.S_phi(omega)
-        kappa_eff += np.abs(g*G/phi_0)**2*S*(omega>0).astype(int)
+        kappa_tpl += np.abs(g*G/phi_0)**2*S*(omega>0).astype(int)
+
+        omega_dict['omega_tpl'] = omega
 
         omega = -omega_pump+2*self.w0[mode_index]
         G = self.G_omega(omega)
         S = self.S_phi(omega)
-        kappa_eff += np.abs(g*G/phi_0)**2*S*(omega>0).astype(int)
-            
+        kappa_tpl += np.abs(g*G/phi_0)**2*S*(omega>0).astype(int)
+
+        omega_dict['omega_tpl_neg_pump'] = omega
+
         # Simultaneous two-photon gain
+        kappa_tpg = 0
         g = (-self.EJ_by_hbar/2)*self.phis[mode_index]**2*self.phis[self.qubit_index]*xi/self.N**2
         omega = omega_pump-2*self.w0[mode_index]
         G = self.G_omega(omega)
         S = self.S_phi(omega)
-        kappa_eff += np.abs(g*G/phi_0)**2*S*(omega>0).astype(int)
+        kappa_tpg += np.abs(g*G/phi_0)**2*S*(omega>0).astype(int)
+
+        omega_dict['omega_tpg'] = omega
 
 
         tmp = self.all_indices.copy()
         tmp.remove(mode_index)
+
+        kappa_multi_mode = 0
 
         for other_mode in tmp:
 
@@ -488,21 +508,31 @@ class forest_calc_network(object):
             omega = omega_pump+self.w0[mode_index]-self.w0[other_mode]
             G = self.G_omega(omega)
             S = self.S_phi(omega)
-            kappa_eff += np.abs(g*G/phi_0)**2*S*(omega>0).astype(int)
+            kappa_multi_mode += np.abs(g*G/phi_0)**2*S*(omega>0).astype(int)
+
+            omega_dict['omega_conv_mode_%d'%other_mode] = omega
 
             omega = -omega_pump+self.w0[mode_index]-self.w0[other_mode]
             G = self.G_omega(omega)
             S = self.S_phi(omega)
-            kappa_eff += np.abs(g*G/phi_0)**2*S*(omega>0).astype(int)
+            kappa_multi_mode += np.abs(g*G/phi_0)**2*S*(omega>0).astype(int)
+
+            omega_dict['omega_conv_mode_%d_neg_pump'%other_mode] = omega
 
             # Exciting the mode of interest, another mode and environment
             g = (-self.EJ_by_hbar)*self.phis[mode_index]*self.phis[other_mode]*self.phis[self.qubit_index]*xi/self.N**2
             omega = omega_pump-self.w0[mode_index]-self.w0[other_mode]
             G = self.G_omega(omega)
             S = self.S_phi(omega)
-            kappa_eff += np.abs(g*G/phi_0)**2*S*(omega>0).astype(int)
+            kappa_multi_mode += np.abs(g*G/phi_0)**2*S*(omega>0).astype(int)
 
-        return kappa_eff
+            omega_dict['omega_tms_mode_%d'%other_mode] = omega
+
+        kappa_eff = kappa_conv + kappa_tms + kappa_tpl + kappa_tpg + kappa_multi_mode
+
+        omega_dict.update({'kappa_conv':kappa_conv,'kappa_tms':kappa_tms,'kappa_tpl':kappa_tpl,'kappa_tpg':kappa_tpg,'kappa_multi_mode':kappa_multi_mode})
+
+        return kappa_eff, pd.DataFrame(omega_dict)
 
 
     def get_kappa_eff_2pump(self,mode_index,omega_pump_1,omega_pump_2,xi_1,xi_2):
@@ -511,67 +541,95 @@ class forest_calc_network(object):
         
         phi_0 = sc.hbar/(2*sc.e)
 
-        kappa_eff_pump_1 = self.get_kappa_eff_1pump(mode_index,omega_pump_1,xi_1)
-        kappa_eff_pump_2 = self.get_kappa_eff_1pump(mode_index,omega_pump_2,xi_2)
+        kappa_eff_pump_1, processes_pump_1 = self.get_kappa_eff_1pump(mode_index,omega_pump_1,xi_1)
+        kappa_eff_pump_2, processes_pump_2 = self.get_kappa_eff_1pump(mode_index,omega_pump_2,xi_2)
 
-        kappa_eff_sum = 0
-
+        sum_dict = {'pump_frequency_sum':np.abs(omega_pump_1+omega_pump_2)}
         # Processes enabled by sum of the pumps
 
         # Conversion to environment
+        kappa_sum_conv = 0
         g = (-self.EJ_by_hbar)*self.phis[mode_index]*self.phis[self.qubit_index]**2*xi_1*xi_2/self.N**2
         omega = omega_pump_1 + omega_pump_2 + self.w0[mode_index]
         G = self.G_omega(omega)
         S = self.S_phi(omega)
-        kappa_eff_sum += np.abs(g*G/phi_0)**2*S*(omega>0).astype(int)
+        kappa_sum_conv += np.abs(g*G/phi_0)**2*S*(omega>0).astype(int)
+
+        sum_dict['omega_sum_conv'] = omega
 
         omega = -omega_pump_1 - omega_pump_2 + self.w0[mode_index]
         G = self.G_omega(omega)
         S = self.S_phi(omega)
-        kappa_eff_sum += np.abs(g*G/phi_0)**2*S*(omega>0).astype(int)
+        kappa_sum_conv += np.abs(g*G/phi_0)**2*S*(omega>0).astype(int)
 
+        sum_dict['omega_sum_conv_neg_pump'] = omega
 
         # Two mode squeezing with environement
+        kappa_sum_tms = 0
         g = (-self.EJ_by_hbar)*self.phis[mode_index]*self.phis[self.qubit_index]**2*xi_1*xi_2/self.N**2
         omega = omega_pump_1 + omega_pump_2 -self.w0[mode_index]
         G = self.G_omega(omega)
         S = self.S_phi(omega)
-        kappa_eff_sum += np.abs(g*G/phi_0)**2*S*(omega>0).astype(int)
+        kappa_sum_tms += np.abs(g*G/phi_0)**2*S*(omega>0).astype(int)
+
+        sum_dict['omega_sum_tms'] = omega
+        sum_dict.update({'kappa_sum_conv':kappa_sum_conv,'kappa_sum_tms':kappa_sum_tms})
+
+        kappa_eff_sum = kappa_sum_conv + kappa_sum_tms
+
 
         # PRocesses enabled by difference of two pumps
 
-        kappa_eff_diff = 0
-
+        diff_dict = {'pump_frequency_difference':np.abs(omega_pump_1-omega_pump_2)}
         # Conversion to environment
+        kappa_diff_conv = 0
         g = (-self.EJ_by_hbar)*self.phis[mode_index]*self.phis[self.qubit_index]**2*xi_1*xi_2/self.N**2
         omega = omega_pump_1 - omega_pump_2 + self.w0[mode_index]
         G = self.G_omega(omega)
         S = self.S_phi(omega)
-        kappa_eff_diff += np.abs(g*G/phi_0)**2*S*(omega>0).astype(int)
+        kappa_diff_conv += np.abs(g*G/phi_0)**2*S*(omega>0).astype(int)
+
+        diff_dict['omega_diff_conv'] = omega
 
         omega = omega_pump_2 - omega_pump_1 + self.w0[mode_index]
         G = self.G_omega(omega)
         S = self.S_phi(omega)
-        kappa_eff_diff += np.abs(g*G/phi_0)**2*S*(omega>0).astype(int)
+        kappa_diff_conv += np.abs(g*G/phi_0)**2*S*(omega>0).astype(int)
+
+        diff_dict['omega_diff_conv_neg_pump'] = omega
 
         # Two mode squeezing with environement
+        kappa_diff_tms = 0
         g = (-self.EJ_by_hbar)*self.phis[mode_index]*self.phis[self.qubit_index]**2*xi_1*xi_2/self.N**2
         omega = omega_pump_1 - omega_pump_2 -self.w0[mode_index]
         G = self.G_omega(omega)
         S = self.S_phi(omega)
-        kappa_eff_diff += np.abs(g*G/phi_0)**2*S*(omega>0).astype(int)
+        kappa_diff_tms += np.abs(g*G/phi_0)**2*S*(omega>0).astype(int)
+
+        diff_dict['omega_diff_tms'] = omega
 
         omega = omega_pump_2 - omega_pump_1 -self.w0[mode_index]
         G = self.G_omega(omega)
         S = self.S_phi(omega)
-        kappa_eff_diff += np.abs(g*G/phi_0)**2*S*(omega>0).astype(int)
+        kappa_diff_tms += np.abs(g*G/phi_0)**2*S*(omega>0).astype(int)
+
+        diff_dict['omega_diff_tms_neg_pump'] = omega
+        diff_dict.update({'kappa_diff_conv':kappa_sum_conv,'kappa_diff_tms':kappa_sum_tms})
+
+        kappa_eff_diff = kappa_diff_conv + kappa_diff_tms
+
+        all_processes = {'pump_1':processes_pump_1,
+                         'pump_2':processes_pump_2,
+                         'pump_sum':pd.DataFrame(sum_dict),
+                         'pump_diff':pd.DataFrame(diff_dict)
+                        }
+
 
 
         partial_kappa_effs = [kappa_eff_pump_1,kappa_eff_pump_2,kappa_eff_sum,kappa_eff_diff]
-
         kappa_eff = kappa_eff_pump_1+kappa_eff_pump_2+kappa_eff_sum+kappa_eff_diff
 
-        return kappa_eff, partial_kappa_effs
+        return kappa_eff, partial_kappa_effs, all_processes
 
 
 
