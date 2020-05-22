@@ -409,7 +409,7 @@ def get_params_for_forest_calc_network(epr,epr_variation,ss,N,qubit_index,modes_
 
 class forest_calc_network(object):
 
-    def __init__(self, w0, EJ_by_hbar, N, phi_zpfs, qubit_index, Z_pp, Z_jp, Z_omegas, R0=50):
+    def __init__(self, w0, EJ_by_hbar, N, phi_zpfs, qubit_index, Z_pp=None, Z_jp=None, Z_omegas=None, Z_jj=None, R0=50):
 
         # Expecting f0, kappa and chis in GHz
         
@@ -420,10 +420,15 @@ class forest_calc_network(object):
         self.qubit_index = qubit_index
         self.Z_pp = Z_pp # Z_port,port Ohm
         self.Z_Jp = Z_jp # Z_junction,port Ohm
+        self.Z_jj = Z_jj
         self.Z_ws = Z_omegas # frequencies at which the Zs are evaluated. rad/s
         self.R0 = R0 # 50 Ohm
         self.all_indices = list(range(len(self.w0)))
-        self.G = Z_jp/(Z_pp+R0)
+        if Z_jj is None: 
+            self.G = Z_jp/(Z_pp+R0)
+        else:
+            self.G = np.sqrt(np.abs(np.real(Z_jj)))/np.sqrt(R0)
+        
         
     def S_phi(self,omega):
         return 2*sc.hbar*self.R0/(omega)
@@ -605,15 +610,14 @@ class forest_calc_network(object):
         G = self.G_omega(omega)
         S = self.S_phi(omega)
         kappa_diff_tms += np.abs(g*G/phi_0)**2*S*(omega>0).astype(int)
-
         diff_dict['omega_diff_tms'] = omega
 
         omega = omega_pump_2 - omega_pump_1 -self.w0[mode_index]
         G = self.G_omega(omega)
         S = self.S_phi(omega)
         kappa_diff_tms += np.abs(g*G/phi_0)**2*S*(omega>0).astype(int)
-
         diff_dict['omega_diff_tms_neg_pump'] = omega
+
         diff_dict.update({'kappa_diff_conv':kappa_sum_conv,'kappa_diff_tms':kappa_sum_tms})
 
         kappa_eff_diff = kappa_diff_conv + kappa_diff_tms
