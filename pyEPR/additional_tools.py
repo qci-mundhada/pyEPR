@@ -427,7 +427,7 @@ class forest_calc_network(object):
         if Z_jj is None: 
             self.G = Z_jp/(Z_pp+R0)
         else:
-            self.G = np.sqrt(np.abs(np.real(Z_jj)))/np.sqrt(R0)
+            self.G = np.sqrt(np.real(Z_jj)*np.real(Z_jj>0).astype('int'))/np.sqrt(R0)
         
         
     def S_phi(self,omega):
@@ -516,6 +516,7 @@ class forest_calc_network(object):
             kappa_multi_mode += np.abs(g*G/phi_0)**2*S*(omega>0).astype(int)
 
             omega_dict['omega_conv_mode_%d'%other_mode] = omega
+            omega_dict['kappa_conv_mode_%d'%other_mode] = np.abs(g*G/phi_0)**2*S*(omega>0).astype(int)
 
             omega = -omega_pump+self.w0[mode_index]-self.w0[other_mode]
             G = self.G_omega(omega)
@@ -523,6 +524,7 @@ class forest_calc_network(object):
             kappa_multi_mode += np.abs(g*G/phi_0)**2*S*(omega>0).astype(int)
 
             omega_dict['omega_conv_mode_%d_neg_pump'%other_mode] = omega
+            omega_dict['kappa_conv_mode_%d_neg_pump'%other_mode] = np.abs(g*G/phi_0)**2*S*(omega>0).astype(int)
 
             # Exciting the mode of interest, another mode and environment
             g = (-self.EJ_by_hbar)*self.phis[mode_index]*self.phis[other_mode]*self.phis[self.qubit_index]*xi/self.N**2
@@ -532,6 +534,7 @@ class forest_calc_network(object):
             kappa_multi_mode += np.abs(g*G/phi_0)**2*S*(omega>0).astype(int)
 
             omega_dict['omega_tms_mode_%d'%other_mode] = omega
+            omega_dict['kappa_tms_mode_%d'%other_mode] = np.abs(g*G/phi_0)**2*S*(omega>0).astype(int)
 
         kappa_eff = kappa_conv + kappa_tms + kappa_tpl + kappa_tpg + kappa_multi_mode
 
