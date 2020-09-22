@@ -546,6 +546,7 @@ class QuantumAnalysis(object):
                           fock_trunc: int = None,
                           print_result: bool = True,
                           junctions: List = None,
+                          junction_Ns: List = None,
                           modes: List[int] = None):
         # TODO avoide analyzing a previously analyzed variation
         '''
@@ -593,6 +594,16 @@ class QuantumAnalysis(object):
         freqs_hfss = self.freqs_hfss[variation].values
         Ljs = self.Ljs[variation].values
 
+        if junction_Ns is not None:
+            N_dim = PJ.shape[1]
+            #print(PJ.shape, N_dim, len(junction_Ns))
+            assert N_dim == len(junction_Ns)
+            junction_Ns = np.asarray(junction_Ns)
+            PJ = PJ/junction_Ns**2
+            EJ = EJ*junction_Ns**2
+            PHI_zpf = PHI_zpf/junction_Ns
+            Ljs = Ljs/junction_Ns**2           
+
         # reduce matrices to only include certain modes/junctions
         if junctions is not None:
             Ljs = Ljs[junctions, ]
@@ -611,7 +622,8 @@ class QuantumAnalysis(object):
             PJ_cap = PJ_cap[:, junctions]
 
         # Analytic 4-th order
-        CHI_O1 = 0.25 * Om @ PJ @ inv(EJ) @ PJ.T @ Om * 1000.  # MHz
+        #CHI_O1 = 0.25 * Om @ PJ @ inv(EJ) @ PJ.T @ Om * 1000.  # MHz
+        CHI_O1 =  PHI_zpf**2 @ EJ @ (PHI_zpf**2).T * 1000.  # MHz
         f1s = np.diag(Om) - 0.5*np.ndarray.flatten(np.array(CHI_O1.sum(1))) / \
             1000.                  # 1st order PT expect freq to be dressed down by alpha
         CHI_O1 = divide_diagonal_by_2(CHI_O1)   # Make the diagonals alpha
