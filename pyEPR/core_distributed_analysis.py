@@ -536,7 +536,7 @@ variation mode
 
         # Get frequency
         freq = CalcObject(
-            [('EnterOutputVar', ('Freq', "Complex"))], self.setup).real().evaluate()
+            [('EnterOutputVar', ('Freq', "Complex"))], self.setup).real().evaluate(lv=lv)
         omega = 2*np.pi*freq  # in SI radian Hz units
 
         Z = omega*junc_L_Henries
@@ -837,6 +837,7 @@ variation mode
             V_peak_[j_name] = V_peak
             Sj['s_' + j_name] = _Smj = 1 if V_peak > 0 else - 1
 
+
             # REPORT prelimnary
             pmj_ind = 0.5*Ljs[j_name] * I_peak**2 / U_E
             pmj_cap = 0.5*Cjs[j_name] * V_peak**2 / U_E
@@ -859,6 +860,8 @@ variation mode
 
         U_tot_ind = U_H + sum(list(U_J_inds.values()))  # total
         U_tot_cap = U_E + sum(list(U_J_caps.values()))
+
+        print(U_tot_ind,U_tot_cap)
 
         # what to use for the norm?  U_tot_cap or the mean of  U_tot_ind and  U_tot_cap?
         # i.e., (U_tot_ind + U_tot_cap)/2
