@@ -1499,7 +1499,7 @@ class HfssFrequencySweep(COMWrapper):
                 with open(fn) as f:
                     f.readline()
                     colnames = f.readline().split()
-                array = np.loadtxt(fn, skiprows=2)
+                array = np.genfromtxt(fn, skip_header=2) #np.loadtxt(fn, skiprows=2)
                 # WARNING for python 3 probably need to use genfromtxt
                 if freq is None:
                     freq = array[:, 0]

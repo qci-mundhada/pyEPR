@@ -72,7 +72,7 @@ config = Dict( # pylint: disable=invalid-name
         # 					Current is integrated average of J_surf by default: (zkm 3/29/16)
         # 					Will calculate the Pj matrix for the selected modes for the given junctions
         # 					junc_rect array & length of junctions
-        method_calc_P_mj='line_voltage' #'J_surf_mag' #,
+        method_calc_P_mj= 'line_voltage' # 'J_surf_mag' # ,
 
     ),
 
