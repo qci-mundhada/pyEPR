@@ -28,7 +28,7 @@ import pandas as pd
 
 from . import Dict, config, logger
 from .ansys import CalcObject, ConstantVecCalcObject, set_property, ureg
-from .calcs.constants import epsilon_0
+from .calcs.constants import epsilon_0, mu_0
 from .project_info import ProjectInfo
 from .reports import (plot_convergence_f_vspass, plot_convergence_max_df,
                       plot_convergence_maxdf_vs_sol,
@@ -616,7 +616,7 @@ variation mode
 
         lv = self._get_lv(variation)
         y_and_Qseam = OrderedDict()
-        print('Calculating Qseam_' + seam + ' for mode ' + str(mode) +
+        print('Calculating y_seam and Q_seam for seam ' + seam + ' and mode ' + str(mode) +
               ' (' + str(mode) + '/' + str(self.n_modes-1) + ')')
 
         if len(self.pinfo.junctions) is not 0:
@@ -636,14 +636,15 @@ variation mode
         A = A.integrate_line(seam)
         H_tangent_square_int_seam = A.evaluate(lv=lv,phase=90) 
         yseam = H_tangent_square_int_seam/total_energy/(self.omega*1e9)
+        Qseam = config.dissipation.gseam/yseam
 
-        y_and_Qseam['U_total'] = total_energy
-        y_and_Qseam['yseam_'+seam] = yseam
-        y_and_Qseam['Qseam_'+seam] = config.dissipation.gseam/yseam
+        y_and_Qseam['U_total_'+seam] = total_energy
+        y_and_Qseam['y_seam_'+seam] = yseam
+        y_and_Qseam['Q_seam_'+seam] = Qseam
 
-        print('total_energy:', total_energy)
-        print('y_seam: ', yseam)
-        print('Q_seam: ',  str(config.dissipation.gseam/yseam))
+        print('U_total_'+seam+': ', total_energy)
+        print('y_seam_'+seam+': ', yseam)
+        print('Q_seam_'+seam+': ',  Qseam)
 
         return pd.Series(y_and_Qseam)
 
@@ -719,6 +720,41 @@ variation mode
               str(mode)+' = ' + str(p_dielectric))
         return pd.Series(Qdielectric)
 
+    def get_Qdielectric_MA_surface(self, surface, mode, variation):
+        '''
+        caculate the contribution to Q of a dieletric layer on selected surface
+        set the dielectric thickness and loss tangent in the config file
+        ref: http://arxiv.org/pdf/1509.01854.pdf
+        '''
+        lv = self._get_lv(variation)
+        p_and_Q = OrderedDict()
+        print('Calculating p_MA and Q_MA for surface '+surface+' and mode ' + str(mode) +
+              ' (' + str(mode) + '/' + str(self.n_modes-1) + ')')
+#        A = self.fields.Mag_E**2
+#        A = A.integrate_vol(name='AllObjects')
+#        U_surf = A.evaluate(lv=lv)
+        calcobject = CalcObject([], self.setup)
+        vecE = calcobject.getQty("E")
+        A = vecE
+        B = vecE.conj()
+        A = A.dot(B)
+        A = A.real()
+        A = A.integrate_surf(name=surface)
+        U_MA = A.evaluate(lv=lv)
+        U_MA *= config.dissipation.th_MA*epsilon_0/config.dissipation.eps_r_MA
+        p_MA = U_MA/self.U_E
+        Q_MA = 1/(p_MA*config.dissipation.tan_delta_MA)
+
+        p_and_Q['U_MA_'+surface] = U_MA
+        p_and_Q['p_MA_'+surface] = p_MA
+        p_and_Q['Q_MA_'+surface] = Q_MA
+
+        print('U_MA_'+surface+': ', U_MA)
+        print('p_MA_'+surface+': ', p_MA)
+        print('Q_MA_'+surface+': ', Q_MA)
+
+        return pd.Series(p_and_Q)
+
     def get_Qsurface_all(self, mode, variation):
         '''
         caculate the contribution to Q of a dieletric layer of dirt on all surfaces
@@ -746,6 +782,45 @@ variation mode
             (p_surf*config.dissipation.tan_delta_surf)
         print('p_surf'+'_'+str(mode)+' = ' + str(p_surf))
         return pd.Series(Qsurf)
+
+    def get_Qcond_surface(self, surface, mode, variation):  # ongoing 11/21/2021 Chan U
+            '''
+            caculate the contribution to Q of a conductive layer on selected surface
+            ref:    https://arxiv.org/abs/1308.1743
+            '''
+            lv = self._get_lv(variation)
+            p_and_Q = OrderedDict()
+            print('Calculating pcond, InvG and Q_cond for surface '+surface+' and mode ' + str(mode) +
+                ' (' + str(mode) + '/' + str(self.n_modes-1) + ')')
+    #        A = self.fields.Mag_E**2
+    #        A = A.integrate_vol(name='AllObjects')
+    #        U_surf = A.evaluate(lv=lv)
+            calcobject = CalcObject([], self.setup)
+            vecH = calcobject.getQty("H")
+            A = vecH
+            B = vecH.conj()
+            A = A.dot(B)
+            A = A.real()
+            A = A.integrate_surf(name=surface)
+
+            U_cond = A.evaluate(lv=lv)
+            U_cond *= config.dissipation.th_cond*mu_0
+            p_cond = U_cond/self.U_H
+
+            InvG_cond = A.evaluate(lv=lv)/self.U_H/(self.omega*1e9)
+            Q_cond = 1/(InvG_cond*config.dissipation.surface_Rs)
+
+            p_and_Q['U_cond_'+surface] = U_cond
+            p_and_Q['p_cond_'+surface] = p_cond
+            p_and_Q['InvG_cond_'+surface] = InvG_cond
+            p_and_Q['Q_cond_'+surface] = Q_cond
+
+            print('U_cond_'+surface+': ', U_cond)
+            print('p_cond_'+surface+': ', p_cond)
+            print('InvG_cond_'+surface+': ', InvG_cond)
+            print('Q_cond_'+surface+': ', Q_cond)
+
+            return pd.Series(p_and_Q)
 
     def calc_Q_external(self, variation, freq_GHz, U_E):
         '''

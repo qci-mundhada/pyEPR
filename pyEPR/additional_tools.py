@@ -87,6 +87,39 @@ def analyze_sweep_no_junctions(epr_hfss):
 
     return all_data
 
+def analyze_sweep_cavity_loss(epr_hfss):
+    modes = range(epr_hfss.n_modes)
+    variations = epr_hfss.variations
+
+    all_data = []
+    for variation in variations:
+        print(f'\n Analyzing variation: ',variation)
+        freqs_bare_GHz, Qs_bare = epr_hfss.get_freqs_bare_pd(variation, frame=False)
+        SOL = []
+        for mode in modes:
+            print('\n'f'Mode {mode} at {"%.2f" % freqs_bare_GHz[mode]} GHz   [{mode+1}/{epr_hfss.n_modes}]')
+            epr_hfss.set_mode(mode,FieldType='EigenStoredEnergy')
+            print('Calculating ℰ_magnetic', end=',')
+            epr_hfss.U_H = epr_hfss.calc_energy_magnetic(variation)
+            print('ℰ_electric')
+            epr_hfss.U_E = epr_hfss.calc_energy_electric(variation)
+
+            sol = pd.Series({'Frequency':freqs_bare_GHz[mode],'U_H': epr_hfss.U_H, 'U_E': epr_hfss.U_E})
+            epr_hfss.omega = 2*np.pi*freqs_bare_GHz[mode]
+            for seam in epr_hfss.pinfo.dissipative.seams:
+                sol=sol.append(epr_hfss.get_Qseam(seam, mode, variation))
+            for MA_surface in epr_hfss.pinfo.dissipative.dielectric_MA_surfaces:
+                sol=sol.append(epr_hfss.get_Qdielectric_MA_surface(MA_surface, mode, variation))
+            for resistive_surface in epr_hfss.pinfo.dissipative.resistive_surfaces:
+                sol=sol.append(epr_hfss.get_Qcond_surface(resistive_surface, mode, variation))
+            SOL.append(sol)
+
+        SOL = pd.DataFrame(SOL)
+        display(SOL)
+        all_data.append(SOL) 
+    all_data = pd.concat(all_data,keys=variations)
+    return all_data
+
 def set_h5_attrs(g, kwargs):
     """Sets attributes of HDF5 group/file g according to dict kwargs.
     Args:

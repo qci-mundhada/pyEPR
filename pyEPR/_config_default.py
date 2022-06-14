@@ -73,10 +73,30 @@ config = Dict( # pylint: disable=invalid-name
         tan_delta_surf=1e-3,
 
         ##################################################
-        # Thin-film surface loss
+        # Metal-Air (MA) Surface dielectric
+        # ref: http://arxiv.org/pdf/1509.01854.pdf
+
+        # MA Surface dielectric thickness
+        # units: meters
+        th_MA=3e-9,
+
+        # Surface dielectric constant
+        # units: relative permitivity
+        eps_r_MA=10,
+
+        # Surface dielectric loss tangent
+        # units: unitless, since this is tan(delta)
+        tan_delta_MA=1e-2,
+
+        ##################################################
+        # Thin-film surface conductive loss
         # units:  Ohms
         # ref:    https://arxiv.org/abs/1308.1743
         surface_Rs=250e-9,
+
+        # Penetration/skin depth of the superconductor/normal metal
+        # units: meters
+        th_cond=50e-9, #penetration depth of aluminum
 
         ##################################################
         # Seam current loss

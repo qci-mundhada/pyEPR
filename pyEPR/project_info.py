@@ -108,6 +108,9 @@ class ProjectInfo(object):
         def __init__(self):
             self.dielectrics_bulk = None
             self.dielectric_surfaces = None
+            self.dielectric_MA_surfaces = None
+            self.dielectric_MS_surfaces = None
+            self.dielectric_SA_surfaces = None
             self.resistive_surfaces = None
             self.seams = None
 
