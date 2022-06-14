@@ -581,32 +581,32 @@ variation mode
         uj = [float(u[0]/jl), float(u[1]/jl), float(u[2]/jl)]
         return jl, uj
 
-    """
-    def get_Qseam(self, seam, mode, variation):
-        r'''
-        Caculate the contribution to Q of a seam, by integrating the current in
-        the seam with finite conductance: set in the config file
-        ref: http://arxiv.org/pdf/1509.01119.pdf
-        '''
+    
+    # def get_Qseam(self, seam, mode, variation):
+    #     r'''
+    #     Caculate the contribution to Q of a seam, by integrating the current in
+    #     the seam with finite conductance: set in the config file
+    #     ref: http://arxiv.org/pdf/1509.01119.pdf
+    #     '''
 
-        lv = self._get_lv(variation)
-        Qseam = OrderedDict()
-        print('Calculating Qseam_' + seam + ' for mode ' + str(mode) +
-              ' (' + str(mode) + '/' + str(self.n_modes-1) + ')')
-        # overestimating the loss by taking norm2 of j, rather than jperp**2
-        j_2_norm = self.fields.Vector_Jsurf.norm_2()
-        int_j_2 = j_2_norm.integrate_line(seam)
-        int_j_2_val = int_j_2.evaluate(lv=lv, phase=90)
-        yseam = int_j_2_val/self.U_H/self.omega
+    #     lv = self._get_lv(variation)
+    #     Qseam = OrderedDict()
+    #     print('Calculating Qseam_' + seam + ' for mode ' + str(mode) +
+    #           ' (' + str(mode) + '/' + str(self.n_modes-1) + ')')
+    #     # overestimating the loss by taking norm2 of j, rather than jperp**2
+    #     j_2_norm = self.fields.Vector_Jsurf.norm_2()
+    #     int_j_2 = j_2_norm.integrate_line(seam)
+    #     int_j_2_val = int_j_2.evaluate(lv=lv, phase=90)
+    #     yseam = int_j_2_val/self.U_H/self.omega
 
-        Qseam['Qseam_'+seam+'_' +
-              str(mode)] = config.dissipation.gseam/yseam
+    #     Qseam['Qseam_'+seam+'_' +
+    #           str(mode)] = config.dissipation.gseam/yseam
 
-        print('Qseam_' + seam + '_' + str(mode) + str(' = ') +
-              str(config.dissipation.gseam/config.dissipation.yseam))
+    #     print('Qseam_' + seam + '_' + str(mode) + str(' = ') +
+    #           str(config.dissipation.gseam/config.dissipation.yseam))
 
-        return pd.Series(Qseam)
-    """
+    #     return pd.Series(Qseam)
+    
     def get_Qseam(self, seam, mode, variation, ansys_energies=None, smooth=True):
         r'''
         Caculate the contribution to Q of a seam, by integrating the current in
@@ -618,19 +618,6 @@ variation mode
         y_and_Qseam = OrderedDict()
         print('Calculating Qseam_' + seam + ' for mode ' + str(mode) +
               ' (' + str(mode) + '/' + str(self.n_modes-1) + ')')
-        # overestimating the loss by taking norm2 of j, rather than jperp**2
-
-        calcobject = CalcObject([], self.setup)
-        vecH = calcobject.getQty("H")
-        tangent = calcobject.getTangent()
-
-        A = vecH.dot(tangent)
-        if smooth:
-            A = A.smooth()
-        A = A.complexmag()
-        A = A.__rmul__(A)
-        A = A.integrate_line(seam)
-        H_tangent_square_int_seam = A.evaluate(lv=lv,phase=90) 
 
         if len(self.pinfo.junctions) is not 0:
             total_energy = self.U_H+ sum(list(ansys_energies[mode]['U_J_inds'].values()))
@@ -638,6 +625,16 @@ variation mode
             print("Seems like there are no junctions. Using U_H as the total energy")
             total_energy = self.U_H
 
+        calcobject = CalcObject([], self.setup)
+        vecH = calcobject.getQty("H")
+        tangent = calcobject.getTangent()
+        A = vecH.dot(tangent)
+        if smooth:
+            A = A.smooth()
+        A = A.complexmag()
+        A = A.__rmul__(A)
+        A = A.integrate_line(seam)
+        H_tangent_square_int_seam = A.evaluate(lv=lv,phase=90) 
         yseam = H_tangent_square_int_seam/total_energy/(self.omega*1e9)
 
         y_and_Qseam['U_total'] = total_energy

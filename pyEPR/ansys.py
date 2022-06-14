@@ -2545,6 +2545,9 @@ class CalcObject(COMWrapper):
     def dot(self, other):
         return self._bin_op(other, "Dot")
 
+    def cross(self, other):
+        return self._bin_op(other, "Cross")
+
     def __neg__(self):
         return self._unary_op("Neg")
 
