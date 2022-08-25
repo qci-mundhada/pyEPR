@@ -39,6 +39,10 @@ def get_cross_kerr_table(epr, swp_variable, numeric):
     swp_indices = chis.index.levels[0]
     mode_indices = chis.index.levels[1]
 
+    f1 = f1[swp_indices]
+
+    #print(swp_indices)
+
     #print(mode_indices)
 
     mode_combinations = list(zip(mode_indices,mode_indices))

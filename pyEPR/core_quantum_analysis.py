@@ -143,7 +143,7 @@ class HamiltonianResultsContainer(OrderedDict):
             Sorted DtaaFrame
         """
         if isinstance(z, pd.DataFrame):
-            return z.sort_index(axis=1)
+            return z.sort_index(axis=0)
         else:
             return z
 
@@ -908,6 +908,7 @@ class QuantumAnalysis(object):
         df = pd.concat(self.results.vs_variations(
             label, vs=swp_variable, variations=variations),
             names=[swp_variable])
+        df.sort_index(inplace=True,axis=0)
         if m is None and n is None:
             return df
         else:

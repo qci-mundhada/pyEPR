@@ -37,7 +37,7 @@ config = Dict( # pylint: disable=invalid-name
         method_calc_P_mj='line_voltage',
 
         # To save or not the mesh statistics from an HFSS run
-        save_mesh_stats=True,
+        save_mesh_stats=False,
     ),
 
     epr = Dict(
