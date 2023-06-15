@@ -706,19 +706,18 @@ variation mode
 
         return Qseamsweep
 
-    def get_Qdielectric(self, dielectric, mode, variation):
-        Qdielectric = OrderedDict()
+    def get_Pdielectric(self, dielectric, mode, variation):
+        Pdielectric = OrderedDict()
         print('Calculating Qdielectric_' + dielectric + ' for mode ' +
               str(mode) + ' (' + str(mode) + '/' + str(self.n_modes-1) + ')')
 
         U_dielectric = self.calc_energy_electric(variation, volume=dielectric)
-        p_dielectric = U_dielectric/self.U_E
+        p_dielectric = U_dielectric/(self.U_E)
         # TODO: Update make p saved sep. and get Q for diff materials, indep. specify in pinfo
-        Qdielectric['Qdielectric_'+dielectric+'_' +
-                    str(mode)] = 1/(p_dielectric*config.dissipation.tan_delta_sapp)
-        print('p_dielectric'+'_'+dielectric+'_' +
+        Pdielectric['pdielectric_'+dielectric] = p_dielectric #1/(p_dielectric*config.dissipation.tan_delta_sapp)
+        print('U_E_',str(self.U_E),'p_dielectric'+'_'+dielectric+'_' +
               str(mode)+' = ' + str(p_dielectric))
-        return pd.Series(Qdielectric)
+        return pd.Series(Pdielectric)
 
     def get_Qdielectric_MA_surface(self, surface, mode, variation):
         '''
@@ -933,7 +932,7 @@ variation mode
         U_tot_ind = U_H + sum(list(U_J_inds.values()))  # total
         U_tot_cap = U_E + sum(list(U_J_caps.values()))
 
-        print(U_tot_ind,U_tot_cap)
+        print('HERE',U_tot_ind,U_tot_cap)
 
         # what to use for the norm?  U_tot_cap or the mean of  U_tot_ind and  U_tot_cap?
         # i.e., (U_tot_ind + U_tot_cap)/2
@@ -1150,7 +1149,7 @@ variation mode
                 # get Q dielectric
                 if self.pinfo.dissipative.dielectrics_bulk:
                     for dielectric in self.pinfo.dissipative.dielectrics_bulk:
-                        sol = sol.append(self.get_Qdielectric(
+                        sol = sol.append(self.get_Pdielectric(
                             dielectric, mode, variation))
 
                 # get Q surface
