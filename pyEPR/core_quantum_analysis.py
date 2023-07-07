@@ -547,7 +547,8 @@ class QuantumAnalysis(object):
                           print_result: bool = True,
                           junctions: List = None,
                           junction_Ns: List = None,
-                          modes: List[int] = None):
+                          modes: List[int] = None,
+                          sparse: bool = False):
         # TODO avoide analyzing a previously analyzed variation
         '''
         Core analysis function to call!
@@ -634,7 +635,8 @@ class QuantumAnalysis(object):
                                                           Ljs,
                                                           PHI_zpf,
                                                           cos_trunc=cos_trunc,
-                                                          fock_trunc=fock_trunc)
+                                                          fock_trunc=fock_trunc,
+                                                          sparse=sparse)
         else:
             f1_ND, CHI_ND = None, None
 

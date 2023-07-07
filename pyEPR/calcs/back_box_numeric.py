@@ -43,7 +43,8 @@ def epr_numerical_diagonalization(freqs, Ljs, ϕzpf,
              cos_trunc=8,
              fock_trunc=9,
              use_1st_order=False,
-             return_H=False):
+             return_H=False,
+             sparse=False):
     '''
     Numerical diagonalizaiton for pyEPR. Ask Zlatko for details.
 
@@ -65,7 +66,7 @@ def epr_numerical_diagonalization(freqs, Ljs, ϕzpf,
     Hs = black_box_hamiltonian(freqs * 1E9, Ljs.astype(np.float), fluxQ*ϕzpf,
                  cos_trunc, fock_trunc, individual=use_1st_order)
     f_ND, χ_ND, _, _ = make_dispersive(
-        Hs, fock_trunc, ϕzpf, freqs, use_1st_order=use_1st_order)
+        Hs, fock_trunc, ϕzpf, freqs, use_1st_order=use_1st_order, sparse=sparse)
     χ_ND = -1*χ_ND * 1E-6  # convert to MHz, and flip sign so that down shift is positive
 
     return (f_ND, χ_ND, Hs) if return_H else (f_ND, χ_ND)
@@ -131,7 +132,7 @@ def black_box_hamiltonian(fs, ljs, fzpfs, cos_trunc=5, fock_trunc=8, individual=
 bbq_hmt = black_box_hamiltonian
 
 def make_dispersive(H, fock_trunc, fzpfs=None, f0s=None, chi_prime=False,
-                    use_1st_order=False):
+                    use_1st_order=False, sparse=False):
     r"""
     Input: Hamiltonian Matrix.
         Optional: phi_zpfs and normal mode frequncies, f0s.
@@ -151,7 +152,9 @@ def make_dispersive(H, fock_trunc, fzpfs=None, f0s=None, chi_prime=False,
             H) == qutip.qobj.Qobj, "Please pass in either  a list of Qobjs or Qobj for the Hamiltonian"
 
     print("Starting the diagonalization")
-    evals, evecs = H.eigenstates()
+    if sparse:
+        print("Will use sparse matrix diagonalization")
+    evals, evecs = H.eigenstates(sparse=sparse)
     print("Finished the diagonalization")
     evals -= evals[0]
 

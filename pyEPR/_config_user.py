@@ -21,7 +21,7 @@ config = Dict( # pylint: disable=invalid-name
 
     # Folder to save result data to.
     # PLEASE CHANGE THIS
-    root_dir=r'D:\data\pyEPR_data',
+    root_dir=r'C:\Ansoft\Shantanu_M\EBBQ_Data',
 
     # Loss properties of various materials and surfaces
     dissipation=Dict(
