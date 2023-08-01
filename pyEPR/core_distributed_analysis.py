@@ -60,7 +60,6 @@ class DistributedAnalysis(object):
         '''
         Pass in the arguments for ProjectInfo. See help for `?ProjectInfo`.
 
-
         Parameters:
         -------------------
             project_info    : ProjectInfo

@@ -15,7 +15,8 @@ from __future__ import print_function
 from functools import reduce
 
 import numpy as np
-
+import time
+import itertools as it
 from .constants import Planck as h
 from .constants import fluxQ, hbar
 from .hamiltonian import MatrixOps
@@ -44,7 +45,8 @@ def epr_numerical_diagonalization(freqs, Ljs, ϕzpf,
              fock_trunc=9,
              use_1st_order=False,
              return_H=False,
-             sparse=False):
+             sparse=False,
+             all_eig = True):
     '''
     Numerical diagonalizaiton for pyEPR. Ask Zlatko for details.
 
@@ -63,10 +65,16 @@ def epr_numerical_diagonalization(freqs, Ljs, ϕzpf,
     assert(all(Ljs < 1E-3)
            ), "Please input the inductances in Henries. \N{nauseated face}"
 
+    print("Starting Hamiltonian generation")
+    start = time.time()
     Hs = black_box_hamiltonian(freqs * 1E9, Ljs.astype(np.float), fluxQ*ϕzpf,
                  cos_trunc, fock_trunc, individual=use_1st_order)
-    f_ND, χ_ND, _, _ = make_dispersive(
-        Hs, fock_trunc, ϕzpf, freqs, use_1st_order=use_1st_order, sparse=sparse)
+    end = time.time()
+    print(f'Hamiltonain generations finished in {end-start} seconds')
+    
+
+    f_ND, χ_ND, _, _ = make_dispersive(Hs, fock_trunc, ϕzpf, freqs, use_1st_order=use_1st_order, sparse=sparse, all_eig=all_eig)
+
     χ_ND = -1*χ_ND * 1E-6  # convert to MHz, and flip sign so that down shift is positive
 
     return (f_ND, χ_ND, Hs) if return_H else (f_ND, χ_ND)
@@ -120,6 +128,8 @@ def black_box_hamiltonian(fs, ljs, fzpfs, cos_trunc=5, fock_trunc=8, individual=
 
     def cos(x):
         return cos_approx(x, cos_trunc=cos_trunc)
+    
+    print('fzpf shape is:',fzpfs.shape)
 
     linear_part = dot(fs, mode_ns)
     cos_interiors = [dot(fzpf_row/fluxQ, mode_fields) for fzpf_row in fzpfs]
@@ -132,7 +142,7 @@ def black_box_hamiltonian(fs, ljs, fzpfs, cos_trunc=5, fock_trunc=8, individual=
 bbq_hmt = black_box_hamiltonian
 
 def make_dispersive(H, fock_trunc, fzpfs=None, f0s=None, chi_prime=False,
-                    use_1st_order=False, sparse=False):
+                    use_1st_order=False, sparse=False, all_eig=True):
     r"""
     Input: Hamiltonian Matrix.
         Optional: phi_zpfs and normal mode frequncies, f0s.
@@ -151,15 +161,34 @@ def make_dispersive(H, fock_trunc, fzpfs=None, f0s=None, chi_prime=False,
         assert type(
             H) == qutip.qobj.Qobj, "Please pass in either  a list of Qobjs or Qobj for the Hamiltonian"
 
-    print("Starting the diagonalization")
-    if sparse:
-        print("Will use sparse matrix diagonalization")
-    evals, evecs = H.eigenstates(sparse=sparse)
-    print("Finished the diagonalization")
-    evals -= evals[0]
 
     N = int(np.log(H.shape[0]) / np.log(fock_trunc))    # number of modes
     assert H.shape[0] == fock_trunc ** N
+
+    if sparse:
+        print("Will use sparse matrix diagonalization")
+
+    if all_eig:
+        N_eigs = 0
+    else:
+        ground_states = 1
+        one_photon_states = N
+        two_photon_states = N+N*(N-1)/2
+        three_photon_states = N+N*(N-1)/2*2+N*(N-1)*(N-2)/6 
+        N_eigs = int(ground_states+one_photon_states+two_photon_states+three_photon_states)
+        print(f"User forbids calculating all eigenvalues. Will only calculate {N_eigs} eigenvalues")
+        # if use_1st_order:
+        #     raise NotImplementedError("Can't use use_1st_order=True when calculating partial eigenvalues.")
+        if chi_prime:
+            raise NotImplementedError("Not calculating enough eigenstates to calculate chi_prime yet")
+        
+
+    print("Starting the diagonalization")
+    start = time.time()
+    evals, evecs = H.eigenstates(sparse=sparse,eigvals=N_eigs)
+    end = time.time()
+    print(f"Finished the diagonalization in {end-start} seconds")
+    # evals -= evals[0]
 
     def fock_state_on(d):
         ''' d={mode number: # of photons} '''
@@ -169,15 +198,13 @@ def make_dispersive(H, fock_trunc, fzpfs=None, f0s=None, chi_prime=False,
         num_modes = N
         print("Using 1st O")
 
-        def multi_index_2_vector(d, num_modes, fock_trunc):
-            return tensor([basis(fock_trunc, d.get(i, 0)) for i in range(num_modes)])
-            '''this function creates a vector representation a given fock state given the data for excitations per
-                        mode of the form d={mode number: # of photons}'''
+        # def multi_index_2_vector(d, num_modes, fock_trunc):
+        #     return tensor(*[basis(fock_trunc, d.get(i, 0)) for i in range(num_modes)])
+        #     '''this function creates a vector representation a given fock state given the data for excitations per
+        #                 mode of the form d={mode number: # of photons}'''
 
-        def find_multi_indices(fock_trunc):
-            multi_indices = [{ind: item for ind, item in enumerate([i, j, k])} for i in range(fock_trunc)
-                             for j in range(fock_trunc)
-                             for k in range(fock_trunc)]
+        def find_multi_indices():
+            multi_indices = [{ind: item for ind, item in enumerate(combo)} for combo in it.combinations_with_replacement(range(fock_trunc),N)]
             return multi_indices
             '''this function generates all possible multi-indices for three modes for a given fock_trunc'''
 
@@ -185,35 +212,32 @@ def make_dispersive(H, fock_trunc, fzpfs=None, f0s=None, chi_prime=False,
             return (left.dag()*middle*right).data.toarray()[0, 0]
             '''this function calculates the expectation value of an operator called "middle" '''
 
-        def get_basis0(fock_trunc, num_modes):
-            multi_indices = find_multi_indices(fock_trunc)
-            basis0 = [multi_index_2_vector(
-                multi_indices[i], num_modes, fock_trunc) for i in range(len(multi_indices))]
-            evalues0 = [get_expect_number(v0, H_lin, v0).real for v0 in basis0]
+        def get_basis0():
+            multi_indices = find_multi_indices()
+            basis0 = [fock_state_on(multi_indices[i]) for i in range(len(multi_indices))]
+            evalues0 = [get_expect_number(v0, H_lin, v0) for v0 in basis0]
             return multi_indices, basis0, evalues0
             '''this function creates a basis of fock states and their corresponding eigenvalues'''
 
         def closest_state_to(vector0):
 
-            def PT_on_vector(original_vector, original_basis, pertub, energy0, evalue):
+            def PT_on_vector(original_vector, original_basis, energy0, evalue):
                 new_vector = 0 * original_vector
                 for i in range(len(original_basis)):
-                    if (energy0[i]-evalue) > 1e-3:
-                        new_vector += ((original_basis[i].dag()*H_nl*original_vector).data.toarray()[
-                                       0, 0])*original_basis[i]/(evalue-energy0[i])
+                    if np.abs(energy0[i]-evalue) > 1e-6:
+                        new_vector += ((original_basis[i].dag()*H_nl*original_vector).data.toarray()[0, 0])*original_basis[i]/(evalue-energy0[i])
                     else:
-                        pass
+                        print('The following vector has eigenvalue too close to the original:',multi_indices[i])
                 return (new_vector + original_vector)/(new_vector + original_vector).norm()
                 '''this function calculates the normalized vector with the first order correction term
                    from the non-linear hamiltonian '''
 
-            [multi_indices, basis0, evalues0] = get_basis0(
-                fock_trunc, num_modes)
+            [multi_indices, basis0, evalues0] = get_basis0()
             evalue0 = get_expect_number(vector0, H_lin, vector0)
-            vector1 = PT_on_vector(vector0, basis0, H_nl, evalues0, evalue0)
-
-            index = np.argmax([(vector1.dag() * evec).norm()
-                               for evec in evecs])
+            # evalues0.remove(evalue0)
+            # basis0.remove(vector0)
+            vector1 = PT_on_vector(vector0, basis0, evalues0, evalue0)
+            index = np.argmax([(vector1.dag() * evec).norm() for evec in evecs])
             return evals[index], evecs[index]
 
     else:
@@ -222,6 +246,10 @@ def make_dispersive(H, fock_trunc, fzpfs=None, f0s=None, chi_prime=False,
                 return (s.dag() * s2[1]).norm()
             return max(zip(evals, evecs), key=distance)
 
+    
+    f0 = closest_state_to(fock_state_on({}))[0]
+    evals -= f0
+    
     f1s = [closest_state_to(fock_state_on({i: 1}))[0] for i in range(N)]
     chis = [[0]*N for _ in range(N)]
     chips = [[0]*N for _ in range(N)]

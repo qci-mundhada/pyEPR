@@ -431,6 +431,9 @@ class QuantumAnalysis(object):
             else:
                 result[variation] = self.analyze_variation(variation, **kwargs)
 
+
+        print('here')
+
         self.results.save()
 
         return result
@@ -548,7 +551,9 @@ class QuantumAnalysis(object):
                           junctions: List = None,
                           junction_Ns: List = None,
                           modes: List[int] = None,
-                          sparse: bool = False):
+                          sparse: bool = False,
+                          all_eig: bool=True,
+                          use_1st_order: bool=False):
         # TODO avoide analyzing a previously analyzed variation
         '''
         Core analysis function to call!
@@ -636,7 +641,9 @@ class QuantumAnalysis(object):
                                                           PHI_zpf,
                                                           cos_trunc=cos_trunc,
                                                           fock_trunc=fock_trunc,
-                                                          sparse=sparse)
+                                                          sparse=sparse,
+                                                          all_eig=all_eig,
+                                                          use_1st_order=use_1st_order)
         else:
             f1_ND, CHI_ND = None, None
 
