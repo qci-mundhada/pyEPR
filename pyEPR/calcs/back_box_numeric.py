@@ -204,7 +204,7 @@ def make_dispersive(H, fock_trunc, fzpfs=None, f0s=None, chi_prime=False,
         #                 mode of the form d={mode number: # of photons}'''
 
         def find_multi_indices():
-            multi_indices = [{ind: item for ind, item in enumerate(combo)} for combo in it.combinations_with_replacement(range(fock_trunc),N)]
+            multi_indices = [{ind: item for ind, item in enumerate(combo)} for combo in it.product(range(fock_trunc),repeat=N)]
             return multi_indices
             '''this function generates all possible multi-indices for three modes for a given fock_trunc'''
 
@@ -212,19 +212,22 @@ def make_dispersive(H, fock_trunc, fzpfs=None, f0s=None, chi_prime=False,
             return (left.dag()*middle*right).data.toarray()[0, 0]
             '''this function calculates the expectation value of an operator called "middle" '''
 
-        def get_basis0():
+        def get_basis0(remove=None):
             multi_indices = find_multi_indices()
+            # print(multi_indices)
+            if remove is not None:
+                multi_indices.remove(remove)
             basis0 = [fock_state_on(multi_indices[i]) for i in range(len(multi_indices))]
             evalues0 = [get_expect_number(v0, H_lin, v0) for v0 in basis0]
             return multi_indices, basis0, evalues0
             '''this function creates a basis of fock states and their corresponding eigenvalues'''
 
-        def closest_state_to(vector0):
+        def closest_state_to(d):
 
             def PT_on_vector(original_vector, original_basis, energy0, evalue):
                 new_vector = 0 * original_vector
                 for i in range(len(original_basis)):
-                    if np.abs(energy0[i]-evalue) > 1e-6:
+                    if 1: #np.abs(energy0[i]-evalue) > 1e-6:
                         new_vector += ((original_basis[i].dag()*H_nl*original_vector).data.toarray()[0, 0])*original_basis[i]/(evalue-energy0[i])
                     else:
                         print('The following vector has eigenvalue too close to the original:',multi_indices[i])
@@ -232,25 +235,34 @@ def make_dispersive(H, fock_trunc, fzpfs=None, f0s=None, chi_prime=False,
                 '''this function calculates the normalized vector with the first order correction term
                    from the non-linear hamiltonian '''
 
-            [multi_indices, basis0, evalues0] = get_basis0()
+            d = {i:d.get(i,0) for i in range(N)}
+            print('Trying to find a matching vector for:',d)
+            vector0 = fock_state_on(d)
+            [multi_indices, basis0, evalues0] = get_basis0(remove=d)
             evalue0 = get_expect_number(vector0, H_lin, vector0)
-            # evalues0.remove(evalue0)
-            # basis0.remove(vector0)
             vector1 = PT_on_vector(vector0, basis0, evalues0, evalue0)
+            evalue1 = get_expect_number(vector0, H_lin+H_nl, vector0)
+            evalue2 = get_expect_number(vector1,H_lin+H_nl,vector1)
             index = np.argmax([(vector1.dag() * evec).norm() for evec in evecs])
-            return evals[index], evecs[index]
+            print("This vector matched to:",index)
 
+            return evals[index], evecs[index]
+            # if d ==  {i:0 for i in range(N)}:
+            #     return evalue1.real, vector1
+            # else:
+            #     return evalue1.real-f0, vector1
     else:
-        def closest_state_to(s):
+        def closest_state_to(d):
+            s = fock_state_on(d)
             def distance(s2):
                 return (s.dag() * s2[1]).norm()
             return max(zip(evals, evecs), key=distance)
 
     
-    f0 = closest_state_to(fock_state_on({}))[0]
+    f0 = closest_state_to({})[0]
     evals -= f0
     
-    f1s = [closest_state_to(fock_state_on({i: 1}))[0] for i in range(N)]
+    f1s = [closest_state_to({i: 1})[0] for i in range(N)]
     chis = [[0]*N for _ in range(N)]
     chips = [[0]*N for _ in range(N)]
     for i in range(N):
@@ -259,16 +271,16 @@ def make_dispersive(H, fock_trunc, fzpfs=None, f0s=None, chi_prime=False,
             d[i] += 1
             d[j] += 1
             # load ith mode and jth mode with 1 photon
-            fs = fock_state_on(d)
-            ev, evec = closest_state_to(fs)
+            # fs = fock_state_on(d)
+            ev, evec = closest_state_to(d)
             chi = (ev - (f1s[i] + f1s[j]))
             chis[i][j] = chi
             chis[j][i] = chi
 
             if chi_prime:
                 d[j] += 1
-                fs = fock_state_on(d)
-                ev, evec = closest_state_to(fs)
+                # fs = fock_state_on(d)
+                ev, evec = closest_state_to(d)
                 chip = (ev - (f1s[i] + 2*f1s[j]) - 2 * chis[i][j])
                 chips[i][j] = chip
                 chips[j][i] = chip
