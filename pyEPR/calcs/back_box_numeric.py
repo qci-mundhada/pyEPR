@@ -43,7 +43,7 @@ cos_approx = MatrixOps.cos_approx
 def epr_numerical_diagonalization(freqs, Ljs, ϕzpf,
              cos_trunc=8,
              fock_trunc=9,
-             use_1st_order=False,
+             use_1st_order=None,
              return_H=False,
              sparse=False,
              all_eig = True):
@@ -142,7 +142,7 @@ def black_box_hamiltonian(fs, ljs, fzpfs, cos_trunc=5, fock_trunc=8, individual=
 bbq_hmt = black_box_hamiltonian
 
 def make_dispersive(H, fock_trunc, fzpfs=None, f0s=None, chi_prime=False,
-                    use_1st_order=False, sparse=False, all_eig=True):
+                    use_1st_order=None, sparse=False, all_eig=True):
     r"""
     Input: Hamiltonian Matrix.
         Optional: phi_zpfs and normal mode frequncies, f0s.
@@ -154,6 +154,13 @@ def make_dispersive(H, fock_trunc, fzpfs=None, f0s=None, chi_prime=False,
         Based on the assignment of the excitations, the function returns the dressed mode frequencies $\omega_m^\prime$, and the cross-Kerr matrix (including anharmonicities) extracted from the numerical diagonalization, as well as from 1st order perturbation theory.
         Note, the diagonal of the CHI matrix is directly the anharmonicity term.
     """
+
+    if use_1st_order is None:
+        use_1st_order = {'return_2O_PT': False, 'PT_fock_cutoff':0, 'identify_vectors_using_1O_PT':False}
+    else:
+        if use_1st_order.get('return_2O_PT', False):
+            use_1st_order['identify_vectors_using_1O_PT'] = True
+
     if hasattr(H, '__len__'):  # is it an array / list?
         [H_lin, H_nl] = H
         H = H_lin + H_nl
@@ -183,28 +190,31 @@ def make_dispersive(H, fock_trunc, fzpfs=None, f0s=None, chi_prime=False,
             raise NotImplementedError("Not calculating enough eigenstates to calculate chi_prime yet")
         
 
-    print("Starting the diagonalization")
-    start = time.time()
-    evals, evecs = H.eigenstates(sparse=sparse,eigvals=N_eigs)
-    end = time.time()
-    print(f"Finished the diagonalization in {end-start} seconds")
-    # evals -= evals[0]
+    if not use_1st_order['return_2O_PT']:
+        print("Starting the diagonalization")
+        start = time.time()
+        evals, evecs = H.eigenstates(sparse=sparse,eigvals=N_eigs)
+        end = time.time()
+        print(f"Finished the diagonalization in {end-start} seconds")
+        # evals -= evals[0]
+    else:
+        print('Going to return 2nd order PT results so not performing the numerical diagonalization')
 
     def fock_state_on(d):
         ''' d={mode number: # of photons} '''
         return qutip.tensor(*[qutip.basis(fock_trunc, d.get(i, 0)) for i in range(N)])  # give me the value d[i]  or 0 if d[i] does not exist
 
-    if use_1st_order:
+    if use_1st_order['identify_vectors_using_1O_PT']:
         num_modes = N
         print("Using 1st O")
 
-        # def multi_index_2_vector(d, num_modes, fock_trunc):
-        #     return tensor(*[basis(fock_trunc, d.get(i, 0)) for i in range(num_modes)])
-        #     '''this function creates a vector representation a given fock state given the data for excitations per
-        #                 mode of the form d={mode number: # of photons}'''
+        if use_1st_order['PT_fock_cutoff']:
+            PT_fock_cutoff = use_1st_order['PT_fock_cutoff']
+        else:
+            PT_fock_cutoff = fock_trunc
 
         def find_multi_indices():
-            multi_indices = [{ind: item for ind, item in enumerate(combo)} for combo in it.product(range(fock_trunc),repeat=N)]
+            multi_indices = [{ind: item for ind, item in enumerate(combo)} for combo in it.product(range(PT_fock_cutoff),repeat=N)]
             return multi_indices
             '''this function generates all possible multi-indices for three modes for a given fock_trunc'''
 
@@ -236,21 +246,23 @@ def make_dispersive(H, fock_trunc, fzpfs=None, f0s=None, chi_prime=False,
                    from the non-linear hamiltonian '''
 
             d = {i:d.get(i,0) for i in range(N)}
-            print('Trying to find a matching vector for:',d)
+            print('1st Order PT analysis of',d)
             vector0 = fock_state_on(d)
             [multi_indices, basis0, evalues0] = get_basis0(remove=d)
             evalue0 = get_expect_number(vector0, H_lin, vector0)
             vector1 = PT_on_vector(vector0, basis0, evalues0, evalue0)
             evalue1 = get_expect_number(vector0, H_lin+H_nl, vector0)
             evalue2 = get_expect_number(vector1,H_lin+H_nl,vector1)
-            index = np.argmax([(vector1.dag() * evec).norm() for evec in evecs])
-            print("This vector matched to:",index)
 
-            return evals[index], evecs[index]
-            # if d ==  {i:0 for i in range(N)}:
-            #     return evalue1.real, vector1
-            # else:
-            #     return evalue1.real-f0, vector1
+            if not use_1st_order['return_2O_PT']:
+                index = np.argmax([(vector1.dag() * evec).norm() for evec in evecs])
+                print("Best ND eigenvector match:",index)
+                return evals[index], evecs[index]
+            else:
+                if d ==  {i:0 for i in range(N)}:
+                    return evalue2.real, vector1
+                else:
+                    return evalue2.real-f0, vector1
     else:
         def closest_state_to(d):
             s = fock_state_on(d)
@@ -260,7 +272,8 @@ def make_dispersive(H, fock_trunc, fzpfs=None, f0s=None, chi_prime=False,
 
     
     f0 = closest_state_to({})[0]
-    evals -= f0
+    if not use_1st_order['return_2O_PT']:
+        evals -= f0
     
     f1s = [closest_state_to({i: 1})[0] for i in range(N)]
     chis = [[0]*N for _ in range(N)]

@@ -553,7 +553,7 @@ class QuantumAnalysis(object):
                           modes: List[int] = None,
                           sparse: bool = False,
                           all_eig: bool=True,
-                          use_1st_order: bool=False):
+                          use_1st_order=None):
         # TODO avoide analyzing a previously analyzed variation
         '''
         Core analysis function to call!
