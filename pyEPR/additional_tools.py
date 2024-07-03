@@ -95,6 +95,27 @@ def analyze_sweep_cavity_loss(epr_hfss):
     modes = range(epr_hfss.n_modes)
     variations = epr_hfss.variations
 
+
+    if epr_hfss.pinfo.dissipative.seams is not None:
+        seams = epr_hfss.pinfo.dissipative.seams
+    else:
+        seams = []
+
+    if epr_hfss.pinfo.dissipative.dielectric_MA_surfaces is not None:
+        dielectric_MA_surfaces = epr_hfss.pinfo.dissipative.dielectric_MA_surfaces
+    else:
+        dielectric_MA_surfaces = []
+
+    if epr_hfss.pinfo.dissipative.resistive_surfaces is not None:
+        resistive_surfaces = epr_hfss.pinfo.dissipative.resistive_surfaces
+    else:
+        resistive_surfaces = []
+
+    if epr_hfss.pinfo.dissipative.dielectrics_bulk is not None:
+        dielectrics_bulk = epr_hfss.pinfo.dissipative.dielectrics_bulk
+    else:
+        dielectrics_bulk = []
+
     all_data = []
     for variation in variations:
         print(f'\n Analyzing variation: ',variation)
@@ -110,12 +131,14 @@ def analyze_sweep_cavity_loss(epr_hfss):
 
             sol = pd.Series({'Frequency':freqs_bare_GHz[mode],'U_H': epr_hfss.U_H, 'U_E': epr_hfss.U_E})
             epr_hfss.omega = 2*np.pi*freqs_bare_GHz[mode]
-            for seam in epr_hfss.pinfo.dissipative.seams:
+            for seam in seams:
                 sol=sol.append(epr_hfss.get_Qseam(seam, mode, variation))
-            for MA_surface in epr_hfss.pinfo.dissipative.dielectric_MA_surfaces:
+            for MA_surface in dielectric_MA_surfaces:
                 sol=sol.append(epr_hfss.get_Qdielectric_MA_surface(MA_surface, mode, variation))
-            for resistive_surface in epr_hfss.pinfo.dissipative.resistive_surfaces:
+            for resistive_surface in resistive_surfaces:
                 sol=sol.append(epr_hfss.get_Qcond_surface(resistive_surface, mode, variation))
+            for dielectric_bulk in dielectrics_bulk:
+                sol=sol.append(epr_hfss.get_Pdielectric(dielectric_bulk, mode, variation))
             SOL.append(sol)
 
         SOL = pd.DataFrame(SOL)

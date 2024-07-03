@@ -802,6 +802,7 @@ variation mode
             A = A.integrate_surf(name=surface)
 
             U_cond = A.evaluate(lv=lv)
+            print(config.dissipation.th_cond)
             U_cond *= config.dissipation.th_cond*mu_0
             p_cond = U_cond/self.U_H
 
