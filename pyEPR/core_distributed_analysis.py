@@ -290,10 +290,10 @@ variation mode
         Returns a multi-index pandas DataFrame
         """
         df = dict()
-        variable = None if vs is 'variation' else self.get_variable_vs_variations(
+        variable = None if vs == 'variation' else self.get_variable_vs_variations(
             vs)
         for variation in self.variations:  # just for the first 2
-            if vs is 'variation':
+            if vs == 'variation':
                 label = variation
             else:
                 label = variable[variation]
@@ -618,7 +618,7 @@ variation mode
         print('Calculating y_seam and Q_seam for seam ' + seam + ' and mode ' + str(mode) +
               ' (' + str(mode) + '/' + str(self.n_modes-1) + ')')
 
-        if len(self.pinfo.junctions) is not 0:
+        if len(self.pinfo.junctions) != 0:
             total_energy = self.U_H+ sum(list(ansys_energies[mode]['U_J_inds'].values()))
         else:
             print("Seems like there are no junctions. Using U_H as the total energy")
@@ -684,7 +684,7 @@ variation mode
             A = A.integrate_line(seam)
             H_tangent_square_int_seam = A.evaluate(lv=lv,phase=90) 
 
-            if len(self.pinfo.junctions) is not 0:
+            if len(self.pinfo.junctions) != 0:
                 total_energy = ansys_energies[mode]['U_tot_ind']
             else:
                 print("Seems like there are no junctions. Using U_H as the total energy")
@@ -878,7 +878,7 @@ variation mode
             Cj = Cjs[j_name]
             line_name = j_props['line']
 
-            if method is 'J_surf_mag':
+            if method == 'J_surf_mag':
 
                 _I_peak_1 = self.calc_avg_current_J_surf_mag(
                     variation, j_props['rect'], line_name)
@@ -894,7 +894,7 @@ variation mode
                 V_peak = _V_peak_2  # make sure this is signed
                 I_peak = _I_peak_1
 
-            elif method is 'line_voltage':
+            elif method == 'line_voltage':
 
                 I_peak, V_peak, _ = self.calc_current_using_line_voltage(
                     variation, line_name, Lj, Cj)
@@ -973,7 +973,7 @@ variation mode
 
         variation : label such as '0' or 'all', in which case return pandas table for all variations
         """
-        if variation is 'all':
+        if variation == 'all':
             # for all variations and concat
             raise NotImplementedError()  # TODO
         else:
@@ -1154,7 +1154,7 @@ variation mode
 
                 # get Q surface
                 if self.pinfo.dissipative.resistive_surfaces:
-                    if self.pinfo.dissipative.resistive_surfaces is 'all':
+                    if self.pinfo.dissipative.resistive_surfaces == 'all':
                         sol = sol.append(
                             self.get_Qsurface_all(mode, variation))
                     else:
