@@ -177,7 +177,7 @@ class HamiltonianResultsContainer(OrderedDict):
 
         res = OrderedDict()
         for key in variations:
-            if vs is 'variation':
+            if vs == 'variation':
                 res[key] = self[key][quantity]
             else:
                 # convert the key to numeric if possible
