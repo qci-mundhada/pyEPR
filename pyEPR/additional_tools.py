@@ -11,7 +11,7 @@ from scipy import integrate as si
 from em_simulations.results import network_data as nd
 from pyEPR import ansys
 
-def get_cross_kerr_table(epr, swp_variable, numeric):
+def get_cross_kerr_table(epr, swp_variable, numeric, num_rounding_digits=3):
     """
     Function to re-organize the cross-Kerr results once the quantum analysis is finished
         Parameters:
@@ -53,7 +53,7 @@ def get_cross_kerr_table(epr, swp_variable, numeric):
     organized_data.set_index(swp_variable,inplace=True)
 
     for mode_indx in mode_indices:
-        organized_data['f_'+str(mode_indx)+'(GHz)']=np.round(f1.loc[mode_indx].values/1000,3)
+        organized_data['f_'+str(mode_indx)+'(GHz)']=np.round(f1.loc[mode_indx].values/1000, num_rounding_digits)
         
     for combo_indx in mode_combinations:
         temp_chi_list = [chis.loc[swp_indx].loc[combo_indx] for swp_indx in swp_indices]

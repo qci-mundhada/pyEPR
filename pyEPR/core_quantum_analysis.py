@@ -430,10 +430,6 @@ class QuantumAnalysis(object):
                 result[variation] = self.results[variation]
             else:
                 result[variation] = self.analyze_variation(variation, **kwargs)
-
-
-        print('here')
-
         self.results.save()
 
         return result
@@ -625,10 +621,13 @@ class QuantumAnalysis(object):
             SJ = SJ[modes, :]
             Om = Om[modes, :][:, modes]
             PHI_zpf = PHI_zpf[modes, :]
-            PJ_cap = PJ_cap[:, junctions]
+            PJ_cap = PJ_cap[:, ] 
 
         # Analytic 4-th order
         #CHI_O1 = 0.25 * Om @ PJ @ inv(EJ) @ PJ.T @ Om * 1000.  # MHz
+
+        print(PHI_zpf, EJ)
+
         CHI_O1 =  PHI_zpf**2 @ EJ @ (PHI_zpf**2).T * 1000.  # MHz
         f1s = np.diag(Om) - 0.5*np.ndarray.flatten(np.array(CHI_O1.sum(1))) / \
             1000.                  # 1st order PT expect freq to be dressed down by alpha
