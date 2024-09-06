@@ -1160,10 +1160,6 @@ variation mode
                     else:
                         raise NotImplementedError(
                             "Join the team, by helping contribute this piece of code.")
-
-                if self.pinfo.dissipative.resistive_surfaces is not None:
-                    raise NotImplementedError(
-                        "Join the team, by helping contribute this piece of code.")
                 
                 SOL[mode] = sol
 
