@@ -717,6 +717,34 @@ variation mode
         print('U_E_',str(self.U_E),'p_dielectric'+'_'+dielectric+'_' +
               str(mode)+' = ' + str(p_dielectric))
         return pd.Series(Pdielectric)
+    
+
+    def get_pSA(self, surface, mode, variation):
+        '''
+        caculate the contribution to Q of a dieletric layer of dirt on all surfaces
+        set the dirt thickness and eps_r in the config file
+        ref: http://arxiv.org/pdf/1509.01854.pdf
+        '''
+        lv = self._get_lv(variation)
+        Psurf = OrderedDict()
+        print('Calculating Psurface for mode ' + str(mode) +
+              ' (' + str(mode) + '/' + str(self.n_modes-1) + ')')
+#        A = self.fields.Mag_E**2
+#        A = A.integrate_vol(name='AllObjects')
+#        U_surf = A.evaluate(lv=lv)
+        calcobject = CalcObject([], self.setup)
+        vecE = calcobject.getQty("E")
+        A = vecE
+        B = vecE.conj()
+        A = A.dot(B)
+        A = A.real()
+        A = A.integrate_surf(name=surface)
+        U_surf = A.evaluate(lv=lv)
+        U_surf *= config.dissipation.th*epsilon_0*config.dissipation.eps_r
+        p_surf = U_surf/self.U_E
+        Psurf[f'p_surf_{surface}'] = p_surf
+        print(f'p_surf_{surface}'+'_'+str(mode)+' = ' + str(p_surf))
+        return pd.Series(Psurf)
 
     def get_Qdielectric_MA_surface(self, surface, mode, variation):
         '''
@@ -1151,8 +1179,13 @@ variation mode
                     for dielectric in self.pinfo.dissipative.dielectrics_bulk:
                         sol = sol.append(self.get_Pdielectric(
                             dielectric, mode, variation))
+                        
+                # get p SA
+                if self.pinfo.dissipative.dielectric_SA_surfaces:
+                    for surface in self.pinfo.dissipative.dielectric_SA_surfaces:
+                        sol = sol.append(self.get_pSA(surface, mode, variation))
 
-                # get Q surface
+                # get resistive surface all
                 if self.pinfo.dissipative.resistive_surfaces:
                     if self.pinfo.dissipative.resistive_surfaces == 'all':
                         sol = sol.append(
