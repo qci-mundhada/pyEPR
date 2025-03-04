@@ -116,6 +116,11 @@ def analyze_sweep_cavity_loss(epr_hfss):
     else:
         dielectrics_bulk = []
 
+    if epr_hfss.pinfo.dissipative.dielectric_SA_surfaces is not None:
+        dielectric_SA_surfaces = epr_hfss.pinfo.dissipative.dielectric_SA_surfaces
+    else:
+        dielectric_SA_surfaces = []
+
     all_data = []
     for variation in variations:
         print(f'\n Analyzing variation: ',variation)
@@ -139,6 +144,9 @@ def analyze_sweep_cavity_loss(epr_hfss):
                 sol=sol.append(epr_hfss.get_Qcond_surface(resistive_surface, mode, variation))
             for dielectric_bulk in dielectrics_bulk:
                 sol=sol.append(epr_hfss.get_Pdielectric(dielectric_bulk, mode, variation))
+            for dielectric_SA_surface in dielectric_SA_surfaces:
+                sol=sol.append(epr_hfss.get_pSA(dielectric_SA_surface,mode,variation))
+
             SOL.append(sol)
 
         SOL = pd.DataFrame(SOL)

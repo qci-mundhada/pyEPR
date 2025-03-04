@@ -298,7 +298,7 @@ class QuantumAnalysis(object):
             ordered dicitonary of key which is the variation number and the magnitude
             of swaver as the item
         """
-        ret = OrderedDict()
+        ret = OrderedDict() 
         if lv is None:
             for key, varz in self._hfss_variables.items():
                 ret[key] = ureg.Quantity(varz['_'+swpvar]).magnitude
