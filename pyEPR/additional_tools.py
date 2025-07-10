@@ -205,3 +205,52 @@ def group_to_dict(group):
         else:
             target[key] = value
     return target
+
+def add_p(self, shape='AllObjects', smooth=False, lv = None):
+    
+        setup = self.setup 
+
+        def create_new_calc_object_with_E_dot_D():
+            calcobject = CalcObject([], setup)
+
+            vecE = calcobject.getQty("E")
+            if smooth:
+                vecE = vecE.smooth()
+
+            vecD = calcobject.getQty("D")
+            if smooth:
+                vecD = vecD.smooth("D")
+
+            C = vecE.dot(vecD)
+
+            return C
+
+        C1 = create_new_calc_object_with_E_dot_D()
+        C2 = create_new_calc_object_with_E_dot_D()
+
+     
+        # Integrate over the appropriate domain
+        if self.design.solution_type == 'electrostatic':
+            C1 = C1.integrate_surf(name=shape)
+        else:
+            C1 = C1.integrate_vol(name=shape)
+
+        # C.write_stack()
+
+        if self.design.solution_type == 'electrostatic':
+            C1 = C1.__div__(C2.integrate_surf(name='AllObjects'))
+        else:
+            C1 = C1.__div__(C2.integrate_vol(name='AllObjects'))
+
+        # Evaluate at the specified variation point
+    
+        # print('vecE:', vecE)
+        # print('vecD:', vecD)
+        # print('C:', C)
+        if lv == None:
+            lv = self._get_lv(variation)
+
+        quantity_name = f'p_{shape}' 
+        C1.save_as(quantity_name)
+
+        return quantity_name

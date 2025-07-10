@@ -1398,8 +1398,47 @@ variation mode
         Use: Get a list of solved variations.
         Return Value: An array of strings corresponding to solved variations.
         Example: list = oModule.ListVariations("Setup1 : LastAdaptive")
-        """
-        return self.design._solutions.ListVariations(str(self.setup.solution_name))
+        """   
+        #return self.design._solutions.ListVariations(str(self.setup.solution_name))
+        
+        
+        #print(self.design._solutions.ListVariations)
+        #return self.design._solutions.ListVariations(str(self.setup.solution_name))
+    
+    #def _get_list_variations(self):
+        
+       #def _get_list_variations(self):
+        try:
+        # Use raw COM object to check design type
+            design_type = self.design._design.GetDesignType().lower()
+            print(f"[pyEPR] Detected design type: {design_type}")
+
+            if "hfss" in design_type:
+            # HFSS path (original)
+                return self.design._solutions.ListVariations(str(self.setup.solution_name))
+            else:
+            # Maxwell or other designs
+                #oModule = self.design._design.GetModule("Optimetrics")
+                #sweepNames = oModule.GetSetupNames()
+
+                variations = []
+                #for sweep in sweepNames:
+                # accumulate variations for all sweeps
+                    #sweep_variations = oModule.GetAllSolutionVariationNames(sweep)
+                    #variations.extend(sweep_variations)
+
+            if variations:
+                return variations
+            else:
+                return ["Nominal"]  # fallback default
+
+        except Exception as e:
+            print("[pyEPR] Failed to get variations:", e)
+            return ["Nominal"]
+
+            
+
+ 
 
     def _update_ansys_variables(self, variations=None):
         """
@@ -1562,3 +1601,43 @@ variation mode
         ax.set_ylabel('Ansys frequencies (MHz)')
         ax.grid(alpha=0.2)
         return fs
+
+    def add_p(self, shape='AllObjects', smooth=False):
+    
+        setup = self.setup 
+
+        def create_new_calc_object_with_E_dot_D():
+            calcobject = CalcObject([], self.setup)
+
+        vecE = calcobject.getQty("E")
+        if smooth:
+            vecE = vecE.smooth()
+        A = vecE.times_eps()
+        B = vecE.conj()
+        A = A.dot(B)
+        A = A.real()
+        C = A.integrate_vol(name=volume)
+        
+        return C
+
+        C1 = create_new_calc_object_with_E_dot_D()
+        C2 = create_new_calc_object_with_E_dot_D()
+
+     
+        # Integrate over the appropriate domain
+        if self.design.solution_type == 'electrostatic':
+            C1 = C1.integrate_surf(name=shape)
+        else:
+            C1 = C1.integrate_vol(name=shape)
+
+        # C.write_stack()
+
+        if self.design.solution_type == 'electrostatic':
+            C1 = C1.__div__(C2.integrate_surf(name='AllObjects'))
+        else:
+            C1 = C1.__div__(C2.integrate_vol(name='AllObjects'))
+
+        quantity_name = f'p_{shape}' 
+        C1.save_as(quantity_name)
+
+        return quantity_name
