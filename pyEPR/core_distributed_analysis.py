@@ -1624,28 +1624,30 @@ variation mode
         Um = H_star.dot(B)
         Ue = Ue.real()
         Um = Um.real()
-        U = 0.5*(Ue + Um)
-        return U
+        return Ue, Um
     
-    def calculate_total_energy(self, smooth=True, variation=None):
-        U = self.get_energy_density(smooth=smooth)
-        energy = U.integrate_vol(name='AllObjects')
-        energy.save_as(f'total_energy')
-        lv = self._get_lv(variation)
-        self.total_energy = energy.evaluate(lv=lv)
-
-    def _get_energy(self, smooth=True, shape='AllObjects', volume_or_surface='volume'):
-        U = self.get_energy_density(smooth=smooth)
+    def add_expression_total_energy(self, smooth=True):
+        Ue, Um = self.get_energy_density(smooth=smooth)
+        energy_e = Ue.integrate_vol(name='AllObjects')
+        energy_m = Um.integrate_vol(name='AllObjects')
+        energy_e.save_as(f'total_energy_electric')
+        energy_m.save_as(f'total_energy_magnetic')
+        
+    def _get_energy_electric(self, smooth=True, shape='AllObjects', volume_or_surface='volume', epsilon_r=None):
+        Ue, _ = self.get_energy_density(smooth=smooth)
+        if epsilon_r:
+            Ue = Ue.__div__(epsilon_r)
         if volume_or_surface == 'volume':
-            energy = U.integrate_vol(name=shape)
+            energy = Ue.integrate_vol(name=shape)
         elif volume_or_surface == 'surface':
-            energy = U.integrate_surf(name=shape)
+            energy = Ue.integrate_surf(name=shape)
         return energy
 
-    def add_expression_participations(self, objects, volume_or_surface='volume', thickness=None):
-        total_energy = self._get_energy()
+    def add_expression_participations(self, objects, volume_or_surface='volume', thickness=None, epsilon_r=None):
+        total_energy = self._get_energy_electric()
         for o in objects:
-            energy = self._get_energy(shape=o, volume_or_surface=volume_or_surface)
+            print(f">>> object: {o}")
+            energy = self._get_energy_electric(shape=o, volume_or_surface=volume_or_surface, epsilon_r=epsilon_r)
             p = energy.__div__(total_energy)
             if thickness:
                 p = p*thickness            

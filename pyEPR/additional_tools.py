@@ -91,8 +91,12 @@ def analyze_sweep_no_junctions(epr_hfss):
 
     return all_data
 
-def analyze_sweep_cavity_loss(epr_hfss):
-    modes = range(epr_hfss.n_modes)
+def analyze_sweep_cavity_loss(epr_hfss, modes=None):
+    if modes == None:
+        modes = range(epr_hfss.n_modes)
+    elif not isinstance(modes,list):
+        modes = [modes]
+
     variations = epr_hfss.variations
 
 
