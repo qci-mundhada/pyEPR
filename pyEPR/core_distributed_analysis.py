@@ -1405,46 +1405,7 @@ variation mode
         Return Value: An array of strings corresponding to solved variations.
         Example: list = oModule.ListVariations("Setup1 : LastAdaptive")
         """   
-        #return self.design._solutions.ListVariations(str(self.setup.solution_name))
-        
-        
-        #print(self.design._solutions.ListVariations)
-        #return self.design._solutions.ListVariations(str(self.setup.solution_name))
-    
-    #def _get_list_variations(self):
-        
-       #def _get_list_variations(self):
-        try:
-        # Use raw COM object to check design type
-            design_type = self.design._design.GetDesignType().lower()
-            print(f"[pyEPR] Detected design type: {design_type}")
-
-            if "hfss" in design_type:
-            # HFSS path (original)
-                return self.design._solutions.ListVariations(str(self.setup.solution_name))
-            else:
-            # Maxwell or other designs
-                #oModule = self.design._design.GetModule("Optimetrics")
-                #sweepNames = oModule.GetSetupNames()
-
-                variations = []
-                #for sweep in sweepNames:
-                # accumulate variations for all sweeps
-                    #sweep_variations = oModule.GetAllSolutionVariationNames(sweep)
-                    #variations.extend(sweep_variations)
-
-            if variations:
-                return variations
-            else:
-                return ["Nominal"]  # fallback default
-
-        except Exception as e:
-            print("[pyEPR] Failed to get variations:", e)
-            return ["Nominal"]
-
-            
-
- 
+        return self.design._solutions.ListVariations(str(self.setup.solution_name))
 
     def _update_ansys_variables(self, variations=None):
         """
