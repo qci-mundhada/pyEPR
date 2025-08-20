@@ -1185,14 +1185,20 @@ variation mode
                     for surface in self.pinfo.dissipative.dielectric_SA_surfaces:
                         sol = sol.append(self.get_pSA(surface, mode, variation))
 
+                if self.pinfo.dissipative.dielectric_MA_surfaces:
+                    for surface in self.pinfo.dissipative.dielectric_MA_surfaces:
+                        sol = sol.append(self.get_Qdielectric_MA_surface(surface, mode, variation))
+
                 # get resistive surface all
                 if self.pinfo.dissipative.resistive_surfaces:
                     if self.pinfo.dissipative.resistive_surfaces == 'all':
                         sol = sol.append(
                             self.get_Qsurface_all(mode, variation))
                     else:
-                        raise NotImplementedError(
-                            "Join the team, by helping contribute this piece of code.")
+                        # raise NotImplementedError(
+                        #     "Join the team, by helping contribute this piece of code.")
+                        for resistive_surface in self.pinfo.dissipative.resistive_surfaces:
+                            sol = sol.append(self.get_Qcond_surface(resistive_surface, mode, variation))
                 
                 SOL[mode] = sol
 

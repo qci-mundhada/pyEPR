@@ -347,7 +347,7 @@ class HfssApp(COMWrapper):
 
         '''
         super(HfssApp, self).__init__()
-        self._app = Dispatch(ProgID)
+        self._app = Dispatch('Ansoft.ElectronicsDesktop.2024.2') #'Ansoft.ElectronicsDesktop.2022.2'
 
     def get_app_desktop(self):
         return HfssDesktop(self, self._app.GetAppDesktop())
