@@ -91,10 +91,13 @@ def analyze_sweep_no_junctions(epr_hfss):
 
     return all_data
 
-def analyze_sweep_cavity_loss(epr_hfss,variations=None):
-    modes = range(epr_hfss.n_modes)
-    if variations == None:
-        variations = epr_hfss.variations
+def analyze_sweep_cavity_loss(epr_hfss, modes=None):
+    if modes == None:
+        modes = range(epr_hfss.n_modes)
+    elif not isinstance(modes,list):
+        modes = [modes]
+
+    variations = epr_hfss.variations
 
 
     if epr_hfss.pinfo.dissipative.seams is not None:
