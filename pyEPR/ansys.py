@@ -622,6 +622,8 @@ class HfssDesign(COMWrapper):
             return HfssDMSetup(self, name)
         elif self.solution_type == "Q3D":
             return AnsysQ3DSetup(self, name)
+        elif self.solution_type == "Electrostatic":
+            return Maxwell2DSetup(self, name)
 
     def create_dm_setup(self, freq_ghz=1, name="Setup", max_delta_s=0.1, max_passes=10,
                         min_passes=1, min_converged=1, pct_refinement=30,
@@ -814,6 +816,7 @@ class HfssSetup(HfssPropertyObject):
         self._reporter = design._reporter
         self._solutions = design._solutions
         self.name = setup
+        #self.solution_name = setup
         self.solution_name = setup + " : LastAdaptive"
         #self.solution_name_pass = setup + " : AdaptivePass"
         self.prop_server = "AnalysisSetup:" + setup
@@ -1102,6 +1105,10 @@ class HfssEMSetup(HfssSetup):
 
     def get_solutions(self):
         return HfssEMDesignSolutions(self, self.parent._solutions)
+
+class Maxwell2DSetup(HfssSetup):
+    def get_solutions(self):
+        return Maxwell2dDesignSolutions(self, self.parent._solutions)
 
 
 class AnsysQ3DSetup(HfssSetup):
@@ -1450,6 +1457,19 @@ class HfssDMDesignSolutions(HfssDesignSolutions):
 class HfssQ3DDesignSolutions(HfssDesignSolutions):
     pass
 
+class Maxwell2dDesignSolutions(HfssDesignSolutions):
+    def ListVariations(self, setup_name):
+        # Maxwell 2D probably does not have variations like HFSS.
+        # So return a default list or query Maxwell-specific sweeps if available.
+        try:
+            optimetrics = self._parent.GetModule("Optimetrics")
+            variations = optimetrics.ListVariations()
+            return variations
+        except Exception:
+            # If no sweeps or API not supported, fallback to 'Nominal'
+            return ["Nominal"]
+
+
 
 class HfssFrequencySweep(COMWrapper):
     prop_tab = "HfssTab"
@@ -1724,7 +1744,7 @@ class HfssModeler(COMWrapper):
     def mesh_length(self, name_mesh, objects: list, MaxLength='0.1mm', **kwargs):
         '''
         "RefineInside:="	, False,
-        "Enabled:="		, True,
+        "Enabled:="		    , True,
         "RestrictElem:="	, False,
         "NumMaxElem:="		, "1000",
         "RestrictLength:="	, True,
@@ -2576,7 +2596,6 @@ class CalcObject(COMWrapper):
         return self._unary_op("ScalarZ")
 
     def norm_2(self):
-
         return (self.__mag__()).__pow__(2)
         # return self._unary_op("ScalarX")**2+self._unary_op("ScalarY")**2+self._unary_op("ScalarZ")**2
 
@@ -2638,6 +2657,7 @@ class CalcObject(COMWrapper):
 
     def write_stack(self):
         for fn, arg in self.stack:
+            print(fn, arg)
             if np.size(arg) > 1 and fn not in ['EnterVector']:
                 getattr(self.calc_module, fn)(*arg)
             else:
@@ -2647,7 +2667,10 @@ class CalcObject(COMWrapper):
         """if the object already exists, try clearing your
         named expressions first with fields.clear_named_expressions"""
         self.write_stack()
-        self.calc_module.AddNamedExpr(name)
+        try:
+            self.calc_module.AddNamedExpr(name)
+        except:
+            print(f'Qunatity {name} already exists. Cannot store it again')
         return NamedCalcObject(name, self.setup)
 
     def evaluate(self, phase=0, lv=None, print_debug=False):  # , n_mode=1):
@@ -2671,6 +2694,32 @@ class CalcObject(COMWrapper):
             args.extend(["Freq:=", self.setup.solution_freq])
 
         self.calc_module.ClcEval(setup_name, args)
+        return float(self.calc_module.GetTopEntryValue(setup_name, args)[0])
+
+    def evaluate_mx2d(self, lv=None, print_debug=False):  
+        self.write_stack()
+        if print_debug:
+            print('---------------------')
+            print('writing to stack: OK')
+            print('-----------------')
+        #self.calc_module.set_mode(n_mode, 0)
+        setup_name = self.setup.solution_name
+
+        # if lv is not None:
+        #     args = lv
+        # else:
+        #     args = []
+
+        args = lv #[f'Variation:={lv}'] 
+
+        print('lv inside:', lv)
+
+        # print('lv:',lv)
+
+        # print('setup_name:',setup_name)
+        print('args:',args)
+        self.calc_module.ClcEval(setup_name, args)
+
         return float(self.calc_module.GetTopEntryValue(setup_name, args)[0])
 
 

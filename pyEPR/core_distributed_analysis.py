@@ -435,7 +435,7 @@ variation mode
                              volume='AllObjects',
                              smooth=True):
         '''
-        See calc_energy_electric
+        See calc_energy_magnetic
         '''
 
         calcobject = CalcObject([], self.setup)
@@ -1068,6 +1068,7 @@ variation mode
         # TODO: Move inside of loop to funciton calle self.analyze_variation
         for ii, variation in enumerate(variations):
             print(f'\nVariation {variation}  [{ii+1}/{len(variations)}]')
+            start = time.perf_counter()
 
             # Previously analyzed and we should re analyze
             if append_analysis and variation in self.get_previously_analyzed():
@@ -1115,7 +1116,7 @@ variation mode
 
                 # Load fields for mode
                 self.set_mode(mode,FieldType='EigenStoredEnergy')
-
+                
                 # Get HFSS  solved frequencies
                 _Om = pd.Series({})
                 temp_freq = freqs_bare_GHz[mode]
@@ -1123,9 +1124,10 @@ variation mode
                 Om[mode] = _Om
                 print('\n'f'  \033[1mMode {mode} at {"%.2f" % temp_freq} GHz   [{mode+1}/{self.n_modes}]\033[0m')
 
+
                 # EPR Hamiltonian calculations
                 # Calculation global energies and report
-
+                t2 = time.perf_counter()
                 # Magnetic
                 print('    Calculating ℰ_magnetic', end=',')
                 try:
@@ -1137,10 +1139,13 @@ variation mode
                     Failed during calculation of the total magnetic energy.\
                     This is the first calculation step, and is indicative that there are \
                     no field solutions saved. ').with_traceback(tb))
-
+                
                 # Electric
                 print('ℰ_electric')
                 self.U_E = self.calc_energy_electric(variation)
+                t3 = time.perf_counter()
+                print(f">>> Timer - field took {t3 - t2} seconds")
+
 
                 sol = pd.Series({'U_H': self.U_H, 'U_E': self.U_E}) # the unnormed
 
@@ -1153,10 +1158,10 @@ variation mode
                 print(
                     f'    Calculating junction energy participation ration (EPR)\n\t method={self.pinfo.options.method_calc_P_mj}. First estimates:')
                 print(f"\t{'junction':<15s} EPR p_{mode}j   sign s_{mode}j    (p_capacitive)")
-
+                
                 Pm[mode], Sm[mode], Pm_cap[mode], I_peak[mode], V_peak[mode], ansys_energies[mode] = self.calc_p_junction(
                     variation, self.U_H/2., self.U_E/2., Ljs, Cjs)
-
+                
                 #sol = sol.append(pd.Series({'U_total':ansys_energies[mode]['U_tot_ind']}))
                 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
                 # EPR Dissipative calculations -- should be a function block below
@@ -1164,11 +1169,10 @@ variation mode
                 # TODO: this should really be passed as argument  to the functions rather than a
                 # property of the calss I would say
                 self.omega = 2*np.pi*freqs_bare_GHz[mode]
-
+                
                 Qm_coupling[mode] = self.calc_Q_external(variation,
                                                          freqs_bare_GHz[mode],
                                                          self.U_E)
-
                 # get seam Q
                 if self.pinfo.dissipative.seams:
                     for seam in self.pinfo.dissipative.seams:
@@ -1211,6 +1215,8 @@ variation mode
             self.save()
 
             self._previously_analyzed.add(variation)
+            end = time.perf_counter()
+            print(f"Variation {variation} done in {end - start:.1f} seconds")
 
         print('\nANALYSIS DONE. Data saved to:\n\n' +
               str(self.data_filename)+'\n\n')
@@ -1404,7 +1410,7 @@ variation mode
         Use: Get a list of solved variations.
         Return Value: An array of strings corresponding to solved variations.
         Example: list = oModule.ListVariations("Setup1 : LastAdaptive")
-        """
+        """   
         return self.design._solutions.ListVariations(str(self.setup.solution_name))
 
     def _update_ansys_variables(self, variations=None):
@@ -1568,3 +1574,48 @@ variation mode
         ax.set_ylabel('Ansys frequencies (MHz)')
         ax.grid(alpha=0.2)
         return fs
+
+
+    def get_energy_density(self, smooth=True):
+        calcobject = CalcObject([], self.setup)
+        vecE = calcobject.getQty("E")
+        vecH = calcobject.getQty("H")
+        if smooth:
+            vecE = vecE.smooth()
+            vecH = vecH.smooth()
+        D = vecE.times_eps()
+        B = vecH.times_mu()
+        E_star = vecE.conj()
+        H_star = vecH.conj()
+        Ue = E_star.dot(D)
+        Um = H_star.dot(B)
+        Ue = Ue.real()
+        Um = Um.real()
+        return Ue, Um
+    
+    def add_expression_total_energy(self, smooth=True):
+        Ue, Um = self.get_energy_density(smooth=smooth)
+        energy_e = Ue.integrate_vol(name='AllObjects')
+        energy_m = Um.integrate_vol(name='AllObjects')
+        energy_e.save_as(f'total_energy_electric')
+        energy_m.save_as(f'total_energy_magnetic')
+        
+    def _get_energy_electric(self, smooth=True, shape='AllObjects', volume_or_surface='volume', epsilon_r=None):
+        Ue, _ = self.get_energy_density(smooth=smooth)
+        if epsilon_r:
+            Ue = Ue.__div__(epsilon_r)
+        if volume_or_surface == 'volume':
+            energy = Ue.integrate_vol(name=shape)
+        elif volume_or_surface == 'surface':
+            energy = Ue.integrate_surf(name=shape)
+        return energy
+
+    def add_expression_participations(self, objects, volume_or_surface='volume', thickness=None, epsilon_r=None):
+        total_energy = self._get_energy_electric()
+        for o in objects:
+            print(f">>> object: {o}")
+            energy = self._get_energy_electric(shape=o, volume_or_surface=volume_or_surface, epsilon_r=epsilon_r)
+            p = energy.__div__(total_energy)
+            if thickness:
+                p = p*thickness            
+            p.save_as(f'p_{o}')

@@ -287,6 +287,12 @@ class ProjectInfo(object):
         for s in ["Non Model", "Solids", "Unclassified", "Sheets", "Lines"]:
             o_objects += self.design.modeler.get_objects_in_group(s)
         return o_objects
+    
+    def get_all_object_names_by_group(self, group):
+        """Returns array of strings"""
+        o_objects = []
+        o_objects += self.design.modeler.get_objects_in_group(group)
+        return o_objects
 
     def validate_junction_info(self):
         """ Validate that the user has put in the junction info correctly.
