@@ -1619,3 +1619,32 @@ variation mode
             if thickness:
                 p = p*thickness            
             p.save_as(f'p_{o}')
+
+    
+    def add_expression_qseam(self, seam, mode=0):
+        _, Um = self.get_energy_density()
+        energy_m = Um.integrate_vol(name='AllObjects')
+        calcobject = CalcObject([], self.setup)
+        Jsurf = calcobject.getQty("Jsurf")
+        J = Jsurf.complexmag()
+        JJ = J.dot(J)
+        loss = JJ.integrate_line(seam)
+        kappa = loss.__div__(energy_m).__div__(config.dissipation.gseam)
+        # f = calcobject.getQty("Output")
+        # qseam = f.__div__(kappa)
+        kappa.save_as("kappa_seam")
+        # vecH = calcobject.getQty("H")
+        # tangent = calcobject.getTangent()
+        # A = vecH.dot(tangent)
+        # A = A.complexmag()
+        # A = A.__rmul__(A)
+        # A = A.integrate_line(seam)
+        # f = calcobject.getQty("Freq")
+        # A = A.__div__(f)
+        # A.save_as("Qseam")
+        # H_tangent_square_int_seam = A.evaluate(phase=90)
+        # freqs_bare_GHz, _ = self.get_freqs_bare_pd(variation=None, frame=False)
+        # self.omega = 2*np.pi*freqs_bare_GHz[mode]*1e9 
+        # yseam = H_tangent_square_int_seam/energy_m/self.omega
+        # Qseam = config.dissipation.gseam/yseam
+        # Qseam.save_as("Qseam")
