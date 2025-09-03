@@ -2657,7 +2657,6 @@ class CalcObject(COMWrapper):
 
     def write_stack(self):
         for fn, arg in self.stack:
-            print(fn, arg)
             if np.size(arg) > 1 and fn not in ['EnterVector']:
                 getattr(self.calc_module, fn)(*arg)
             else:
