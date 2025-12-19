@@ -67,7 +67,7 @@ def epr_numerical_diagonalization(freqs, Ljs, ϕzpf,
 
     print("Starting Hamiltonian generation")
     start = time.time()
-    Hs = black_box_hamiltonian(freqs * 1E9, Ljs.astype(np.float), fluxQ*ϕzpf,
+    Hs = black_box_hamiltonian(freqs * 1E9, Ljs.astype(np.float64), fluxQ*ϕzpf,
                  cos_trunc, fock_trunc, individual=use_1st_order)
     end = time.time()
     print(f'Hamiltonain generations finished in {end-start} seconds')
