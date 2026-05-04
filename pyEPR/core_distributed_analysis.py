@@ -809,10 +809,11 @@ variation mode
         print('p_surf'+'_'+str(mode)+' = ' + str(p_surf))
         return pd.Series(Qsurf)
 
-    def get_Qcond_surface(self, surface, mode, variation):  # ongoing 11/21/2021 Chan U
+    def get_Qcond_surface(self, surface, mode, variation, ansys_energies=None, smooth=True):  
             '''
             caculate the contribution to Q of a conductive layer on selected surface
             ref:    https://arxiv.org/abs/1308.1743
+            04/25/2026, Shantanu: Updated to include energy stored in junction
             '''
             lv = self._get_lv(variation)
             p_and_Q = OrderedDict()
@@ -824,6 +825,8 @@ variation mode
             calcobject = CalcObject([], self.setup)
             vecH = calcobject.getQty("H")
             A = vecH
+            if smooth:
+                A = A.smooth()
             B = vecH.conj()
             A = A.dot(B)
             A = A.real()
@@ -832,9 +835,17 @@ variation mode
             U_cond = A.evaluate(lv=lv)
             print(config.dissipation.th_cond)
             U_cond *= config.dissipation.th_cond*mu_0
-            p_cond = U_cond/self.U_H
 
-            InvG_cond = A.evaluate(lv=lv)/self.U_H/(self.omega*1e9)
+            if len(self.pinfo.junctions) != 0:
+                total_energy = self.U_H+ sum(list(ansys_energies[mode]['U_J_inds'].values()))
+            else:
+                print("Seems like there are no junctions. Using U_H as the total energy")
+                total_energy = self.U_H
+
+
+            p_cond = U_cond/total_energy
+
+            InvG_cond = A.evaluate(lv=lv)/total_energy/(self.omega*1e9)
             Q_cond = 1/(InvG_cond*config.dissipation.surface_Rs)
 
             p_and_Q['U_cond_'+surface] = U_cond
@@ -843,6 +854,7 @@ variation mode
             p_and_Q['Q_cond_'+surface] = Q_cond
 
             print('U_cond_'+surface+': ', U_cond)
+            print('U_total_'+surface+': ', total_energy)
             print('p_cond_'+surface+': ', p_cond)
             print('InvG_cond_'+surface+': ', InvG_cond)
             print('Q_cond_'+surface+': ', Q_cond)
@@ -1202,7 +1214,7 @@ variation mode
                         # raise NotImplementedError(
                         #     "Join the team, by helping contribute this piece of code.")
                         for resistive_surface in self.pinfo.dissipative.resistive_surfaces:
-                            sol = sol.append(self.get_Qcond_surface(resistive_surface, mode, variation))
+                            sol = sol.append(self.get_Qcond_surface(resistive_surface, mode, variation,ansys_energies=ansys_energies))
                 
                 SOL[mode] = sol
 
