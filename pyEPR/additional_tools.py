@@ -8,7 +8,6 @@ import h5py
 import itertools as it
 from scipy import constants as sc
 from scipy import integrate as si
-from em_simulations.results import network_data as nd
 from pyEPR import ansys
 
 def get_cross_kerr_table(epr, swp_variable, numeric, num_rounding_digits=3):
